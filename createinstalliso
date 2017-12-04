@@ -527,7 +527,7 @@ main () {
 	fi
 
 	if ! is_supported_mac_os_x_major_version "${mac_os_x_major_version}"; then
-		echo_warning "This tool has not been tested on Mac OS X ${mac_os_x_major_version}.X."
+		echo_warning "This tool has not been tested on Mac OS X ${mac_os_x_major_version}."
 	fi
 
 	unset option_applicationpath
@@ -767,7 +767,7 @@ main () {
 	installer_mac_os_x_major_version="$(get_installer_mac_os_x_major_version "${global_writable_installer_disk_image_mountpoint}")" || exit_with_error "Couldn't get Mac OS X version contained in OS installer application."
 
 	if ! is_supported_installer_mac_os_x_major_version "${installer_mac_os_x_major_version}"; then
-		echo_warning "This tool has not been tested with the Mac OS X ${installer_mac_os_x_major_version}.X installer."
+		echo_warning "This tool has not been tested with the Mac OS X ${installer_mac_os_x_major_version} installer."
 	fi
 
 	echo "Copying installer files to disk image..."
