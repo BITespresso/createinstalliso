@@ -1098,12 +1098,11 @@ main () {
 	# ==================================================================
 
 	echo "Copying installer files to disk image..."
-	cp -p "${base_system_dmg_file}" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "The copy of BaseSystem.dmg failed."
-	cp -p "${base_system_dmg_file%.dmg}.chunklist" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "The copy of BaseSystem.chunklist failed."
-
 	rm -f "${global_writable_installer_disk_image_mountpoint}/System/Installation/Packages" &> /dev/null || exit_with_error "Failed to delete Packages symlink."
+	cp -pPR "${global_install_esd_dmg_mountpoint}/Packages" "${global_writable_installer_disk_image_mountpoint}/System/Installation/" &> /dev/null || exit_with_error "Failed to copy Packages directory."
 
-	cp -pPR "${global_install_esd_dmg_mountpoint}/Packages" "${global_writable_installer_disk_image_mountpoint}/System/Installation/" &> /dev/null || exit_with_error "The copy of Packages failed."
+	cp -p "${base_system_dmg_file}" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.dmg."
+	cp -p "${base_system_dmg_file%.dmg}.chunklist" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.chunklist."
 	echo "Copy complete."
 
 	# ==================================================================
