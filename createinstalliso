@@ -82,7 +82,7 @@ exit_handler() {
 }
 
 signal_handler() {
-	local -r exit_status="$?"
+	local -r -i exit_status="$?"
 
 	trap - EXIT
 	cleanup
@@ -583,9 +583,9 @@ get_user_consent() {
 }
 
 get_example_installer_application_name() {
-	local -r number_of_elements="${#const_supported_installer_application_display_names[@]}"
+	local -r -i number_of_elements="${#const_supported_installer_application_display_names[@]}"
 	local example_installer_application_name="${const_supported_installer_application_display_names[${number_of_elements}-1]}.app"
-	local i
+	local -i i
 
 	for (( i = number_of_elements - 1; i >= 0; i-- )); do
 		if is_valid_installer_application_path "/Applications/${const_supported_installer_application_display_names[${i}]}.app"; then
@@ -617,7 +617,7 @@ get_installer_application_type()
 {
 	local -r installer_application_path="$1"
 	local system_image_url
-	local installer_application_type="0"
+	local -i installer_application_type="0"
 
 	is_not_empty "${installer_application_path}" || return 1
 
@@ -1057,9 +1057,9 @@ main () {
 	# Resize writable disk image
 	# ==================================================================
 
-	local base_system_dmg_total_bytes
-	local install_esd_dmg_total_non_empty_bytes
-	local writable_installer_disk_image_size
+	local -i base_system_dmg_total_bytes
+	local -i install_esd_dmg_total_non_empty_bytes
+	local -i writable_installer_disk_image_size
 
 	base_system_dmg_total_bytes="$(get_disk_image_total_bytes "${base_system_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total bytes of disk image ${base_system_dmg_file}."; }
 	install_esd_dmg_total_non_empty_bytes="$(get_disk_image_total_non_empty_bytes "${install_esd_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total non-empty bytes of disk image ${install_esd_dmg_file}."; }
