@@ -1,0 +1,791 @@
+#!/bin/bash
+
+# createinstalliso - Creates a bootable ISO image from a Mac OS X
+# installer application.
+# Copyright (C) 2017 Michael Berger <michael.berger@gmx.de>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+if ! [ -n "${BASH}" ]; then
+	echo "This tool must be run in Bash shell." 1>&2
+	exit 1
+fi
+
+declare -r const_script_name="createinstalliso"
+declare -r -i const_root_uid="0"
+declare -r -a const_unsupported_mac_os_x_major_versions=(
+	"10.0"
+	"10.1"
+	"10.2"
+	"10.3"
+	"10.4"
+	"10.5"
+)
+declare -r -a const_supported_mac_os_x_major_versions=(
+	"10.6"
+	"10.7"
+	"10.8"
+	"10.9"
+	"10.10"
+	"10.11"
+	"10.12"
+)
+declare -r -a const_supported_installer_mac_os_x_major_versions=(
+	"10.7"
+	"10.8"
+	"10.9"
+	"10.10"
+	"10.11"
+	"10.12"
+)
+declare -r -a const_example_installer_application_names=(
+	"Install Mac OS X Lion.app"
+	"Install OS X Mountain Lion.app"
+	"Install OS X Mavericks.app"
+	"Install OS X Yosemite.app"
+	"Install OS X El Capitan.app"
+	"Install macOS Sierra.app"
+)
+
+unset global_exit_message
+unset global_tmp_directory
+unset global_install_esd_dmg_mountpoint
+unset global_writable_installer_disk_image_mountpoint
+unset global_incomplete_iso_destination_file
+declare -i global_exit_with_error_exit_status="1"
+
+exit_handler() {
+	trap - EXIT
+	cleanup
+
+	if is_not_empty "${global_exit_message-}"; then
+		echo "${global_exit_message}"
+		unset global_exit_message
+	fi
+}
+
+signal_handler() {
+	local -r exit_status="$?"
+
+	trap - EXIT
+	cleanup
+
+	unset global_exit_message
+	exit "${exit_status}"
+}
+
+cleanup() {
+	if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
+		if is_not_empty "${global_writable_installer_disk_image_mountpoint-}" && is_existing "${global_writable_installer_disk_image_mountpoint}"; then
+			hdiutil detach "${global_writable_installer_disk_image_mountpoint}" -force &> /dev/null && unset global_writable_installer_disk_image_mountpoint
+		fi
+		if is_not_empty "${global_install_esd_dmg_mountpoint-}" && is_existing "${global_install_esd_dmg_mountpoint}"; then
+			hdiutil detach "${global_install_esd_dmg_mountpoint}" -force &> /dev/null && unset global_install_esd_dmg_mountpoint
+		fi
+
+	    rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
+	fi
+
+	if is_not_empty "${global_incomplete_iso_destination_file-}" && is_existing "${global_incomplete_iso_destination_file}"; then
+		rm -rf "${global_incomplete_iso_destination_file}" &> /dev/null && unset global_incomplete_iso_destination_file
+	fi
+	return 0
+}
+
+echo_warning() {
+	echo -n "+++ WARNING: " 1>&2
+	echo "$@" 1>&2
+	return 0
+}
+
+echo_error() {
+	echo "$@" 1>&2
+	return 0
+}
+
+echo_error_usage() {
+	cat <<-EOF 1>&2
+	Usage: ${const_script_name} --destinationpath <path to destination directory> --applicationpath <path to OS installer application> [--genuine] [--nointeraction]
+
+	Arguments--destinationpath, A path to a directory where the installer ISO image will be created.
+	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
+	--genuine, Create an ISO image that is most close to Apple's Install DVD, but potentially less compatible with some BIOS/UEFI.
+	--nointeraction, Delete an existing file (or directory) in the destination directory when it has the same name as the target ISO file without prompting for confirmation.
+
+	Example: ${const_script_name} --destinationpath ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
+EOF
+	if ! is_root; then
+		echo_error
+		echo_error "This tool must be run as root."
+	fi
+	return 0
+}
+
+is_empty() {
+	local -r string="$1"
+
+	[[ -z "${string}" ]]
+}
+
+is_not_empty() {
+	local -r string="$1"
+
+	[[ -n "${string}" ]]
+}
+
+is_existing() {
+	local -r file_or_directory="$1"
+
+	[[ -e "${file_or_directory}" ]]
+}
+
+is_file() {
+	local -r file_or_directory="$1"
+
+	[[ -f "${file_or_directory}" ]]
+}
+
+is_directory() {
+	local -r file_or_directory="$1"
+
+	[[ -d "${file_or_directory}" ]]
+}
+
+is_root() {
+	[[ "$(id -u)" -eq "${const_root_uid}" ]]
+}
+
+is_option_including_option_argument() {
+	local -r option="$1"
+
+	[[ "${option}" == --*=* ]] || [[ "${option}" == -[^-]?* ]]
+}
+
+is_long_option_including_option_argument() {
+	local -r option="$1"
+
+	[[ "${option}" == --*=* ]]
+}
+
+is_long_option() {
+	local -r option="$1"
+
+	[[ "${option}" == --?* ]]
+}
+
+is_valid_long_option() {
+	local -r long_option="$1"
+	local -r full_long_option="$2"
+	local -r valid_option_regex="^[-[:alnum:]]+$"
+
+	[[ "${long_option}" =~ ${valid_option_regex} && "${full_long_option}" == "${long_option}"* ]]
+}
+
+is_short_options_combination() {
+	local -r option="$1"
+
+	[[ "${option}" == -[^-]?* ]]
+}
+
+is_valid_destination_directory_path() {
+	local -r destination_directory_path="$1"
+
+	is_not_empty "${destination_directory_path}" || return 1
+
+	is_directory "${destination_directory_path}"
+}
+
+is_valid_installer_application_path() {
+	local -r installer_application_path="$1"
+
+	is_not_empty "${installer_application_path}" || return 1
+
+	is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+}
+
+is_mac_os_x() {
+	local -r os_name="$1"
+
+	is_not_empty "${os_name}" || return 1
+
+	[[ "${os_name}" == "Darwin" ]]
+}
+
+is_unsupported_mac_os_x_major_version() {
+	local -r mac_os_x_major_version="$1"
+
+	is_array_item "${mac_os_x_major_version}" "const_unsupported_mac_os_x_major_versions"
+}
+
+is_supported_mac_os_x_major_version() {
+	local -r mac_os_x_major_version="$1"
+
+	is_array_item "${mac_os_x_major_version}" "const_supported_mac_os_x_major_versions"
+}
+
+is_supported_installer_mac_os_x_major_version() {
+	local -r mac_os_x_major_version="$1"
+
+	is_array_item "${mac_os_x_major_version}" "const_supported_installer_mac_os_x_major_versions"
+}
+
+is_array_item() {
+	local -r item="$1"
+	local -r array_name="$2[@]"
+	local current_item
+
+	for current_item in "${!array_name}"; do
+		if [[ "${current_item}" == "${item}" ]]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+remove_mac_os_x_minor_version() {
+	local -r mac_os_x_version="$1"
+	local mac_os_x_major_version
+
+	is_not_empty "${mac_os_x_version}" || return 1
+
+	if [[ "${mac_os_x_version}" == *.*.* ]]; then
+		mac_os_x_major_version="${mac_os_x_version%.*}"
+	else
+		mac_os_x_major_version="${mac_os_x_version}"
+	fi
+
+	echo "${mac_os_x_major_version}"
+	return 0
+}
+
+execute_plist_buddy_command() {
+	local -r plist_command="$1"
+	local -r plist_file="$2"
+
+	is_not_empty "${plist_command}" || return 1
+	is_not_empty "${plist_file}" || return 1
+
+	/usr/libexec/PlistBuddy -c "${plist_command}" "${plist_file}" 2> /dev/null
+}
+
+get_os_name() {
+	local os_name
+
+	os_name="$(uname -s 2> /dev/null)" || return 1
+
+	echo "${os_name}"
+	return 0
+}
+
+get_mac_os_x_major_version() {
+	local mac_os_x_version
+	local mac_os_x_major_version
+
+	mac_os_x_version="$(sw_vers -productVersion 2> /dev/null)" || return 1
+	mac_os_x_major_version="$(remove_mac_os_x_minor_version "${mac_os_x_version}")" || return 1
+
+	echo "${mac_os_x_major_version}"
+	return 0
+}
+
+get_plist_entry() {
+	local -r entry="$1"
+	local -r plist_file="$2"
+
+	is_not_empty "${entry}" || return 1
+	is_not_empty "${plist_file}" || return 1
+
+	execute_plist_buddy_command "Print '${entry}'" "${plist_file}"
+}
+
+get_installer_display_name() {
+	local -r installer_application_path="$1"
+
+	is_not_empty "${installer_application_path}" || return 1
+
+	get_plist_entry ":CFBundleDisplayName" "${installer_application_path}/Contents/Info.plist"
+}
+
+get_installer_mac_os_x_major_version() {
+	local -r global_writable_installer_disk_image_mountpoint="$1"
+	local installer_mac_os_x_version
+	local installer_mac_os_x_major_version
+
+	is_not_empty "${global_writable_installer_disk_image_mountpoint}" || return 1
+
+	installer_mac_os_x_version="$(get_plist_entry ":ProductVersion" "${global_writable_installer_disk_image_mountpoint}/System/Library/CoreServices/SystemVersion.plist")" || return 1
+	installer_mac_os_x_major_version="$(remove_mac_os_x_minor_version "${installer_mac_os_x_version}")" || return 1
+
+	echo "${installer_mac_os_x_major_version}"
+	return 0
+}
+
+get_disk_image_total_bytes() {
+	local -r disk_image_file="$1"
+	local plist_file
+
+	is_not_empty "${disk_image_file}" || return 1
+	is_not_empty "${global_tmp_directory-}" || return 1
+
+	plist_file="${disk_image_file##*/}"
+	plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
+	hdiutil imageinfo "${disk_image_file}" -plist > "${plist_file}" 2> /dev/null || return 1
+
+	get_plist_entry ":Size Information:Total Bytes" "${plist_file}"
+}
+
+get_disk_image_total_non_empty_bytes() {
+	local -r disk_image_file="$1"
+	local plist_file
+
+	is_not_empty "${disk_image_file}" || return 1
+	is_not_empty "${global_tmp_directory-}" || return 1
+
+	plist_file="${disk_image_file##*/}"
+	plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
+	hdiutil imageinfo "${disk_image_file}" -plist > "${plist_file}" 2> /dev/null || return 1
+
+	get_plist_entry ":Size Information:Total Non-Empty Bytes" "${plist_file}"
+}
+
+get_file_size_in_bytes() {
+	local -r file="$1"
+
+	is_not_empty "${file}" || return 1
+	is_file "${file}" || return 1
+
+	stat -f %z "${file}"
+}
+
+get_absolute_logical_path() {
+	local -r file_or_directory="$1"
+
+	is_not_empty "${file_or_directory}" || return 1
+	is_existing "${file_or_directory}" || return 1
+
+	if is_directory "${file_or_directory}"; then
+		echo "$(cd "${file_or_directory}"; pwd -L)"
+	else
+		if [[ "${file_or_directory}" == */* ]]; then
+			echo "$(cd "${file_or_directory%/*}"; pwd -L)/${file_or_directory##*/}"
+		else
+			echo "$(pwd -L)/${file_or_directory}"
+		fi
+	fi
+	return 0
+}
+
+get_user_consent() {
+	local -r prompt="$1"
+	local input
+	local -r yes_regex="^[yY].*$"
+
+	echo -n "${prompt}"
+	input="$(IFS=""; read -r input; echo "${input}")"
+
+	[[ "${input}" =~ ${yes_regex} ]]
+}
+
+get_example_installer_application_name() {
+	local -r number_of_elements="${#const_example_installer_application_names[@]}"
+	local example_installer_application_name="${const_example_installer_application_names[${number_of_elements}-1]}"
+	local i
+
+	for (( i = number_of_elements - 1; i >= 0; i-- )); do
+		if is_valid_installer_application_path "/Applications/${const_example_installer_application_names[${i}]}"; then
+			example_installer_application_name="${const_example_installer_application_names[${i}]}"
+			break
+		fi
+	done
+
+	echo "${example_installer_application_name}"
+	return 0
+}
+
+create_iso_image() {
+	local source_image="$1"
+	local destination_image="$2"
+	local default_volume_name="$3"
+
+	is_not_empty "${source_image}" || return 1
+	is_not_empty "${destination_image}" || return 1
+	is_not_empty "${default_volume_name}" || return 1
+
+	is_existing "${source_image}" || return 1
+
+	hdiutil makehybrid -o "${destination_image}" "${source_image}" -hfs -udf -default-volume-name "${default_volume_name}" &> /dev/null
+}
+
+exit_invalid_option() {
+	local -r option="$1"
+
+	if is_long_option "${option}"; then
+		echo_error "${const_script_name}: unrecognized option \`${option}'"
+	else
+		echo_error "${const_script_name}: invalid option -- ${option:1}"
+	fi
+
+	echo_error_usage
+	exit 255
+}
+
+exit_missing_option_argument_for_option() {
+	local -r option="$1"
+
+	if is_long_option "${option}"; then
+		echo_error "${const_script_name}: option \`${option}' requires an argument"
+	else
+		echo_error "${const_script_name}: option requires an argument -- ${option:1}"
+	fi
+
+	echo_error_usage
+	exit 255
+}
+
+exit_no_option_argument_allowed_for_long_option(){
+	local -r long_option="$1"
+
+	echo_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
+
+	echo_error_usage
+	exit 255
+}
+
+exit_ambiguous_long_option() {
+	local -r long_option="$1"
+
+	echo_error "${const_script_name}: option \`${long_option}' is ambiguous"
+
+	echo_error_usage
+	exit 255
+}
+
+exit_with_error() {
+	local -r -a error_messages=("$@")
+
+	if (( ${#error_messages[@]} > 0 )); then
+		echo_error "${error_messages[@]}"
+	fi
+
+	exit "${global_exit_with_error_exit_status:-1}"
+}
+
+main () {
+	set -o errexit
+	set -o errtrace
+	set -o nounset
+	set -o pipefail
+
+	trap "exit_handler" EXIT
+	trap "signal_handler" SIGHUP SIGINT SIGQUIT SIGPIPE SIGTERM
+
+	local os_name
+	local mac_os_x_major_version
+
+	os_name="$(get_os_name)" || exit_with_error "Couldn't get operating system name."
+
+	if ! is_mac_os_x "${os_name}"; then
+		echo_error "This tool must be run on Mac OS X."
+		exit 1
+	fi
+
+	mac_os_x_major_version="$(get_mac_os_x_major_version)" || exit_with_error "Couldn't get Mac OS X version."
+
+	if is_unsupported_mac_os_x_major_version "${mac_os_x_major_version}"; then
+		echo_error "This tool requires Mac OS X ${const_supported_mac_os_x_major_versions[0]} or later."
+		exit 1
+	fi
+
+	if ! is_supported_mac_os_x_major_version "${mac_os_x_major_version}"; then
+		echo_warning "This tool has not been tested on Mac OS X ${mac_os_x_major_version}.X."
+	fi
+
+	unset option_applicationpath
+	unset option_destinationpath
+	local option_genuine="false"
+	local option_nointeraction="false"
+
+	local full_long_option
+	local option_argument
+
+	if (( $# < 4 )); then
+		echo_error_usage
+		exit 0
+	fi
+
+	if ! is_root; then
+		echo_error "This tool must be run as root."
+		exit 249
+	fi
+
+	while [[ "${1+set}" == "set" ]]; do
+		case "$1" in
+
+			# Option '--applicationpath'
+			-a* | --a* )
+				full_long_option="--applicationpath"
+
+				if is_option_including_option_argument "$1"; then
+					if is_long_option "$1"; then
+						is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
+						option_argument="${1#--*=}"
+					else
+						option_argument="${1#-?}"
+					fi
+					shift
+				else
+					if is_long_option "$1"; then
+						is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+					fi
+					[[ "${2+set}" == "set" ]] || exit_missing_option_argument_for_option "$1"
+					option_argument="$2"
+					shift 2
+				fi
+
+				option_applicationpath="${option_argument}"
+				;;
+
+			# Option '--destinationpath'
+			-d* | --d* )
+				full_long_option="--destinationpath"
+
+				if is_option_including_option_argument "$1"; then
+					if is_long_option "$1"; then
+						is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
+						option_argument="${1#--*=}"
+					else
+						option_argument="${1#-?}"
+					fi
+					shift
+				else
+					if is_long_option "$1"; then
+						is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+					fi
+					[[ "${2+set}" == "set" ]] || exit_missing_option_argument_for_option "$1"
+					option_argument="$2"
+					shift 2
+				fi
+
+				option_destinationpath="${option_argument}"
+				;;
+
+			# Option '--genuine'
+			-g* | --g* )
+				full_long_option="--genuine"
+
+				if is_long_option_including_option_argument "$1"; then
+					is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
+					exit_no_option_argument_allowed_for_long_option "${1%%=*}"
+				elif is_long_option "$1"; then
+					is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+					shift
+				elif is_short_options_combination "$1"; then
+					set -- "-${1:2}" "${@:2}"
+				else
+					shift
+				fi
+
+				option_genuine="true"
+				;;
+
+			# Option '--nointeraction'
+			-n* | --n* )
+				full_long_option="--nointeraction"
+
+				if is_long_option_including_option_argument "$1"; then
+					is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
+					exit_no_option_argument_allowed_for_long_option "${1%%=*}"
+				elif is_long_option "$1"; then
+					is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+					shift
+				elif is_short_options_combination "$1"; then
+					set -- "-${1:2}" "${@:2}"
+				else
+					shift
+				fi
+
+				option_nointeraction="true"
+				;;
+
+			# End of options
+			-- )
+				shift
+				break
+				;;
+
+			# Ambiguous long option
+			--=* )
+				exit_ambiguous_long_option "${1%%=*}"
+				;;
+
+			# Invalid short or long option
+			-[^-]* | --?* )
+				exit_invalid_option "$1"
+				;;
+
+			# Non-option argument or single '-'
+			* )
+				shift
+				;;
+
+		esac
+	done
+
+	if [[ "${option_applicationpath+set}" != "set" || "${option_destinationpath+set}" != "set" ]]; then
+		echo_error "You must specify both the destination directory and install application path."
+		exit 255
+	fi
+
+	if ! is_valid_destination_directory_path "${option_destinationpath}"; then
+		echo_error "${option_destinationpath} is not a valid destination directory."
+		exit 254
+	fi
+
+	if ! is_valid_installer_application_path "${option_applicationpath}"; then
+		echo_error "${option_applicationpath} does not appear to be a valid OS installer application."
+		exit 253
+	fi
+
+	local absolute_installer_application_path
+	local absolute_destination_directory_path
+	local installer_display_name
+	local iso_destination_file
+	local type_of_existing_destination_file
+
+	absolute_installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
+	absolute_destination_directory_path="$(get_absolute_logical_path "${option_destinationpath}")" || exit_with_error "Couldn't get absolute path for ${option_destinationpath}."
+
+	installer_display_name="$(get_installer_display_name "${absolute_installer_application_path}")" || exit_with_error "Couldn't get display name for OS installer application."
+
+	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
+
+	iso_destination_file="${absolute_destination_directory_path}/${installer_display_name}.iso"
+
+	if is_existing "${iso_destination_file}"; then
+		if is_file "${iso_destination_file}"; then
+			type_of_existing_destination_file="file"
+		else
+			type_of_existing_destination_file="directory"
+		fi
+		if [[ ! "${option_nointeraction}" == "true" ]]; then
+			echo "Ready to start."
+			echo "To continue we need to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
+			if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
+				echo -n "Operation canceled."
+				exit 0
+			fi
+		fi
+
+		rm -rf "${iso_destination_file}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
+	fi
+
+	local install_esd_dmg_file
+	local install_esd_dmg_shadow
+	local base_system_dmg_file
+	local writable_installer_disk_image_file
+	local tmp_installer_disk_image_file
+
+	global_exit_with_error_exit_status="0"
+	global_exit_message="Done."
+
+	install_esd_dmg_file="${absolute_installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+	install_esd_dmg_shadow="${global_tmp_directory}/InstallESD.shadow"
+	global_install_esd_dmg_mountpoint="${global_tmp_directory}/InstallESD"
+
+	echo -n "Creating Image: 0%..." 1>&2
+	hdiutil attach "${install_esd_dmg_file}" -shadow "${install_esd_dmg_shadow}" -readonly -kernel -mountpoint "${global_install_esd_dmg_mountpoint}" -nobrowse &> /dev/null || { echo 1>&2; exit_with_error "Couldn't mount dmg ${install_esd_dmg_file}."; }
+
+	base_system_dmg_file="${global_install_esd_dmg_mountpoint}/BaseSystem.dmg"
+
+	is_file "${base_system_dmg_file}" || { echo 1>&2; exit_with_error "BaseSystem missing from the outer dmg, damaged installer image?"; }
+
+	writable_installer_disk_image_file="${global_tmp_directory}/WritableInstallerDiskImage.sparsebundle"
+	global_writable_installer_disk_image_mountpoint="${global_tmp_directory}/WritableInstallerDiskImage"
+
+	if [[ "${option_genuine}" == "true" ]]; then
+		echo -n " 50%..." 1>&2
+		hdiutil convert "${base_system_dmg_file}" -format UDSB -o "${writable_installer_disk_image_file}" -pmap &> /dev/null || { echo 1>&2; exit_with_error "Couldn't convert BaseSystem to writable disk image."; }
+	else
+		echo -n " 30%..." 1>&2
+		tmp_installer_disk_image_file="${global_tmp_directory}/TemporaryInstallerDiskImage.dmg"
+		hdiutil create -srcdevice "${base_system_dmg_file}" "${tmp_installer_disk_image_file}" -layout ISOCD &> /dev/null || { echo 1>&2; exit_with_error "Couldn't create temporary disk image from BaseSystem."; }
+
+		echo -n " 60%..." 1>&2
+		hdiutil convert "${tmp_installer_disk_image_file}" -format UDSB -o "${writable_installer_disk_image_file}" -pmap &> /dev/null || { echo 1>&2; exit_with_error "Couldn't convert temporary disk image to writable disk image."; }
+		rm -f "${tmp_installer_disk_image_file}" &> /dev/null
+	fi
+
+	local base_system_dmg_total_bytes
+	local install_esd_dmg_total_non_empty_bytes
+	local base_system_dmg_file_size_in_bytes
+
+	base_system_dmg_total_bytes="$(get_disk_image_total_bytes "${base_system_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total bytes of disk image ${base_system_dmg_file}."; }
+	install_esd_dmg_total_non_empty_bytes="$(get_disk_image_total_non_empty_bytes "${install_esd_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total non-empty bytes of disk image ${install_esd_dmg_file}."; }
+	base_system_dmg_file_size_in_bytes="$(get_file_size_in_bytes "${base_system_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get size of file ${base_system_dmg_file}."; }
+
+	(( writable_installer_disk_image_size = base_system_dmg_total_bytes + (install_esd_dmg_total_non_empty_bytes - base_system_dmg_file_size_in_bytes) ))
+	(( writable_installer_disk_image_size = writable_installer_disk_image_size + (writable_installer_disk_image_size / 10) ))
+	(( writable_installer_disk_image_size = ((writable_installer_disk_image_size / 512) + 1) * 512 ))
+
+	hdiutil resize -size "${writable_installer_disk_image_size}" "${writable_installer_disk_image_file}" -nofinalgap &> /dev/null || { echo 1>&2; exit_with_error "Couldn't resize writable disk image."; }
+
+	hdiutil attach "${writable_installer_disk_image_file}" -readwrite -mountpoint "${global_writable_installer_disk_image_mountpoint}" -nobrowse &> /dev/null || { echo 1>&2; exit_with_error "Couldn't mount writable disk image."; }
+	echo "100%..." 1>&2
+
+	local installer_mac_os_x_major_version
+
+	installer_mac_os_x_major_version="$(get_installer_mac_os_x_major_version "${global_writable_installer_disk_image_mountpoint}")" || exit_with_error "Couldn't get Mac OS X version contained in OS installer application."
+
+	if ! is_supported_installer_mac_os_x_major_version "${installer_mac_os_x_major_version}"; then
+		echo_warning "This tool has not been tested with the Mac OS X ${installer_mac_os_x_major_version}.X installer."
+	fi
+
+	echo "Copying installer files to disk image..."
+	cp -p "${base_system_dmg_file}" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "The copy of BaseSystem.dmg failed."
+	cp -p "${base_system_dmg_file%.dmg}.chunklist" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "The copy of BaseSystem.chunklist failed."
+
+	rm -f "${global_writable_installer_disk_image_mountpoint}/System/Installation/Packages" &> /dev/null || exit_with_error "Failed to delete Packages symlink."
+
+	cp -pPR "${global_install_esd_dmg_mountpoint}/Packages" "${global_writable_installer_disk_image_mountpoint}/System/Installation/" &> /dev/null || exit_with_error "The copy of Packages failed."
+	echo "Copy complete."
+
+	local core_services_directory
+
+	echo "Making disk image bootable..."
+	core_services_directory="${global_writable_installer_disk_image_mountpoint}/System/Library/CoreServices"
+	bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_writable_installer_disk_image_mountpoint}" --label "${installer_display_name}" &> /dev/null || exit_with_error "The bless of the installer disk image failed."
+
+	hdiutil detach "${global_writable_installer_disk_image_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount writable disk image."
+	unset global_writable_installer_disk_image_mountpoint
+
+	local source_device_id
+	local destination_device_id
+
+	echo "Creating ISO image..."
+	source_device_id="$(stat -f '%d' "${global_tmp_directory}")" || exit_with_error "Couldn't get device ID for temporary directory."
+	destination_device_id="$(stat -f '%d' "${absolute_destination_directory_path}")" || exit_with_error "Couldn't get device ID for destination directory."
+
+	if [[ "${destination_device_id}" == "${source_device_id}" ]]; then
+		create_iso_image "${writable_installer_disk_image_file}" "${global_tmp_directory}/InstallerDiskImage.iso" "${installer_display_name}" || exit_with_error "Failed to create ISO image."
+		mv -f "${global_tmp_directory}/InstallerDiskImage.iso" "${iso_destination_file}" &> /dev/null || exit_with_error "Couldn't move ISO image to destination directory."
+	else
+		global_incomplete_iso_destination_file="${iso_destination_file}"
+		create_iso_image "${writable_installer_disk_image_file}" "${iso_destination_file}" "${installer_display_name}" || exit_with_error "Failed to create ISO image."
+		unset global_incomplete_iso_destination_file
+	fi
+
+	exit 0
+}
+
+main "$@"
