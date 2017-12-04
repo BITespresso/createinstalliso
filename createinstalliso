@@ -351,33 +351,6 @@ is_array_item() {
 }
 
 # ----------------------------------------------------------------------
-# Returns the major version part of a Mac OS X version number. Example:
-# The major version part of the version number '10.12.6' is '10.12'.
-#
-# Input:
-# $1 - Mac OS X version number
-#
-# Output:
-# major version part of the Mac OS X version number
-# ----------------------------------------------------------------------
-get_mac_os_x_major_version_from_mac_os_x_version() {
-	local -r mac_os_x_version="$1"
-	local mac_os_x_major_version
-	local -r valid_mac_os_x_major_version_regex='^10\.[[:digit:]]+$'
-
-	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
-
-	if [[ "${mac_os_x_version}" =~ ${valid_mac_os_x_major_version_regex} ]]; then
-		mac_os_x_major_version="${mac_os_x_version}"
-	else
-		mac_os_x_major_version="${mac_os_x_version%.*}"
-	fi
-
-	echo "${mac_os_x_major_version}"
-	return 0
-}
-
-# ----------------------------------------------------------------------
 # Executes a PlistBuddy command on a property list file.
 #
 # Input:
@@ -426,6 +399,33 @@ get_mac_os_x_major_version() {
 	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
 
 	mac_os_x_major_version="$(get_mac_os_x_major_version_from_mac_os_x_version "${mac_os_x_version}")" || return 1
+
+	echo "${mac_os_x_major_version}"
+	return 0
+}
+
+# ----------------------------------------------------------------------
+# Returns the major version part of a Mac OS X version number. Example:
+# The major version part of the version number '10.12.6' is '10.12'.
+#
+# Input:
+# $1 - Mac OS X version number
+#
+# Output:
+# major version part of the Mac OS X version number
+# ----------------------------------------------------------------------
+get_mac_os_x_major_version_from_mac_os_x_version() {
+	local -r mac_os_x_version="$1"
+	local mac_os_x_major_version
+	local -r valid_mac_os_x_major_version_regex='^10\.[[:digit:]]+$'
+
+	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
+
+	if [[ "${mac_os_x_version}" =~ ${valid_mac_os_x_major_version_regex} ]]; then
+		mac_os_x_major_version="${mac_os_x_version}"
+	else
+		mac_os_x_major_version="${mac_os_x_version%.*}"
+	fi
 
 	echo "${mac_os_x_major_version}"
 	return 0
