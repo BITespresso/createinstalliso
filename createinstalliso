@@ -1059,6 +1059,7 @@ main () {
 
 	local base_system_dmg_total_bytes
 	local install_esd_dmg_total_non_empty_bytes
+	local writable_installer_disk_image_size
 
 	base_system_dmg_total_bytes="$(get_disk_image_total_bytes "${base_system_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total bytes of disk image ${base_system_dmg_file}."; }
 	install_esd_dmg_total_non_empty_bytes="$(get_disk_image_total_non_empty_bytes "${install_esd_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total non-empty bytes of disk image ${install_esd_dmg_file}."; }
