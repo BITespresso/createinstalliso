@@ -312,7 +312,7 @@ is_mac_os_x() {
 
 is_valid_mac_os_x_version() {
 	local -r mac_os_x_version="$1"
-	local -r valid_mac_os_x_version_regex="^[[:digit:]]+\.[[:digit:]]+(\.[[:digit:]]+){0,1}$"
+	local -r valid_mac_os_x_version_regex='^10\.[[:digit:]]+(\.[[:digit:]]+)?$'
 
 	[[ "${mac_os_x_version}" =~ ${valid_mac_os_x_version_regex} ]]
 }
@@ -372,7 +372,7 @@ is_array_item() {
 get_mac_os_x_major_version_from_mac_os_x_version() {
 	local -r mac_os_x_version="$1"
 	local mac_os_x_major_version
-	local -r valid_mac_os_x_major_version_regex="^[[:digit:]]+\.[[:digit:]]+$"
+	local -r valid_mac_os_x_major_version_regex='^10\.[[:digit:]]+$'
 
 	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
 
@@ -597,7 +597,7 @@ get_absolute_logical_path() {
 get_user_consent() {
 	local -r prompt="$1"
 	local input
-	local -r yes_regex="^[yY].*$"
+	local -r yes_regex='^[yY].*$'
 
 	echo -n "${prompt}"
 	input="$(IFS=""; read -r input; echo "${input}")"
