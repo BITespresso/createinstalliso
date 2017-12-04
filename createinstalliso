@@ -450,7 +450,7 @@ get_mac_os_x_major_version() {
 # Output:
 # value of the specified entry
 # ----------------------------------------------------------------------
-get_plist_entry() {
+get_plist_value() {
 	local -r entry="$1"
 	local -r plist_file="$2"
 
@@ -474,7 +474,7 @@ get_installer_application_display_name() {
 
 	is_not_empty "${installer_application_path}" || return 1
 
-	get_plist_entry ":CFBundleDisplayName" "${installer_application_path}/Contents/Info.plist"
+	get_plist_value ":CFBundleDisplayName" "${installer_application_path}/Contents/Info.plist"
 }
 
 # ----------------------------------------------------------------------
@@ -491,7 +491,7 @@ get_installer_mac_os_x_major_version() {
 
 	is_not_empty "${global_writable_installer_disk_image_mountpoint}" || return 1
 
-	installer_mac_os_x_version="$(get_plist_entry ":ProductVersion" "${global_writable_installer_disk_image_mountpoint}/System/Library/CoreServices/SystemVersion.plist")" || return 1
+	installer_mac_os_x_version="$(get_plist_value ":ProductVersion" "${global_writable_installer_disk_image_mountpoint}/System/Library/CoreServices/SystemVersion.plist")" || return 1
 	is_valid_mac_os_x_version "${installer_mac_os_x_version}" || return 1
 
 	installer_mac_os_x_major_version="$(get_mac_os_x_major_version_from_mac_os_x_version "${installer_mac_os_x_version}")" || return 1
@@ -521,7 +521,7 @@ get_disk_image_total_bytes() {
 	plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
 	hdiutil imageinfo "${disk_image_file}" -plist > "${plist_file}" 2> /dev/null || return 1
 
-	get_plist_entry ":Size Information:Total Bytes" "${plist_file}"
+	get_plist_value ":Size Information:Total Bytes" "${plist_file}"
 }
 
 # ----------------------------------------------------------------------
@@ -545,7 +545,7 @@ get_disk_image_total_non_empty_bytes() {
 	plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
 	hdiutil imageinfo "${disk_image_file}" -plist > "${plist_file}" 2> /dev/null || return 1
 
-	get_plist_entry ":Size Information:Total Non-Empty Bytes" "${plist_file}"
+	get_plist_value ":Size Information:Total Non-Empty Bytes" "${plist_file}"
 }
 
 get_file_size_in_bytes() {
