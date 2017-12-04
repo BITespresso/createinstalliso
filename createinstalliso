@@ -229,6 +229,13 @@ is_mac_os_x() {
 	[[ "${os_name}" == "Darwin" ]]
 }
 
+is_valid_mac_os_x_version() {
+	local -r mac_os_x_version="$1"
+	local -r valid_mac_os_x_version_regex="^[[:digit:]]+\.[[:digit:]]+(\.[[:digit:]]+){0,1}$"
+
+	[[ "${mac_os_x_version}" =~ ${valid_mac_os_x_version_regex} ]]
+}
+
 is_unsupported_mac_os_x_major_version() {
 	local -r mac_os_x_major_version="$1"
 
@@ -260,16 +267,17 @@ is_array_item() {
 	return 1
 }
 
-remove_mac_os_x_minor_version() {
+get_mac_os_x_major_version_from_mac_os_x_version() {
 	local -r mac_os_x_version="$1"
 	local mac_os_x_major_version
+	local -r valid_mac_os_x_major_version_regex="^[[:digit:]]+\.[[:digit:]]+$"
 
-	is_not_empty "${mac_os_x_version}" || return 1
+	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
 
-	if [[ "${mac_os_x_version}" == *.*.* ]]; then
-		mac_os_x_major_version="${mac_os_x_version%.*}"
-	else
+	if [[ "${mac_os_x_version}" =~ ${valid_mac_os_x_major_version_regex} ]]; then
 		mac_os_x_major_version="${mac_os_x_version}"
+	else
+		mac_os_x_major_version="${mac_os_x_version%.*}"
 	fi
 
 	echo "${mac_os_x_major_version}"
@@ -300,7 +308,9 @@ get_mac_os_x_major_version() {
 	local mac_os_x_major_version
 
 	mac_os_x_version="$(sw_vers -productVersion 2> /dev/null)" || return 1
-	mac_os_x_major_version="$(remove_mac_os_x_minor_version "${mac_os_x_version}")" || return 1
+	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
+
+	mac_os_x_major_version="$(get_mac_os_x_major_version_from_mac_os_x_version "${mac_os_x_version}")" || return 1
 
 	echo "${mac_os_x_major_version}"
 	return 0
@@ -332,7 +342,9 @@ get_installer_mac_os_x_major_version() {
 	is_not_empty "${global_writable_installer_disk_image_mountpoint}" || return 1
 
 	installer_mac_os_x_version="$(get_plist_entry ":ProductVersion" "${global_writable_installer_disk_image_mountpoint}/System/Library/CoreServices/SystemVersion.plist")" || return 1
-	installer_mac_os_x_major_version="$(remove_mac_os_x_minor_version "${installer_mac_os_x_version}")" || return 1
+	is_valid_mac_os_x_version "${installer_mac_os_x_version}" || return 1
+
+	installer_mac_os_x_major_version="$(get_mac_os_x_major_version_from_mac_os_x_version "${installer_mac_os_x_version}")" || return 1
 
 	echo "${installer_mac_os_x_major_version}"
 	return 0
