@@ -184,97 +184,97 @@ is_root() {
 }
 
 # ----------------------------------------------------------------------
-# Checks if an option has an option parameter.
+# Checks if an argument is an option including an option parameter.
 #
 # Input:
-# $1 - option as provided on the command line (including leading '-')
+# $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
-is_option_including_option_argument() {
-	local -r option="$1"
+is_option_including_option_parameter() {
+	local -r argument="$1"
 
-	is_long_option_including_option_argument "${option}" || is_short_option_including_option_argument "${option}"
+	is_long_option_including_option_parameter "${argument}" || is_short_option_including_option_parameter "${argument}"
 }
 
 # ----------------------------------------------------------------------
-# Checks if an option is a long option including an option parameter.
+# Checks if an argument is a long option including an option parameter.
 #
 # Input:
-# $1 - option as provided on the command line (including leading '-')
+# $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
-is_long_option_including_option_argument() {
-	local -r option="$1"
+is_long_option_including_option_parameter() {
+	local -r argument="$1"
 
-	[[ "${option}" == --*=* ]]
+	[[ "${argument}" == --*=* ]]
 }
 
 # ----------------------------------------------------------------------
-# Checks if an option is a short option including an option parameter.
+# Checks if an argument is a short option including an option parameter.
 #
 # Input:
-# $1 - option as provided on the command line (including leading '-')
+# $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
-is_short_option_including_option_argument() {
-	local -r option="$1"
+is_short_option_including_option_parameter() {
+	local -r argument="$1"
 
-	[[ "${option}" == -[^-]?* ]]
+	[[ "${argument}" == -[^-]?* ]]
 }
 
 # ----------------------------------------------------------------------
-# Checks if an option is a long option.
+# Checks if an argument is a long option.
 #
 # Input:
-# $1 - option as provided on the command line (including leading '-')
+# $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
 is_long_option() {
-	local -r option="$1"
+	local -r argument="$1"
 
-	[[ "${option}" == --?* ]]
+	[[ "${argument}" == --?* ]]
 }
 
 # ----------------------------------------------------------------------
-# Checks if an option is a valid abbreviation for a given long option.
+# Checks if an argument is a valid abbreviation for a given long option.
 #
 # Input:
-# $1 - option as provided on the command line (including leading '-')
+# $1 - argument as provided on the command line (including leading '-')
 # $2 - long option (including leading '-')
 #
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
 is_valid_long_option() {
-	local -r long_option="$1"
-	local -r full_long_option="$2"
+	local -r argument="$1"
+	local -r long_option="$2"
 
-	is_long_option "${long_option}" || return 1
+	is_long_option "${argument}" || return 1
 
-	[[ "${full_long_option}" == "${long_option}"* ]]
+	[[ "${long_option}" == "${argument}"* ]]
 }
 
 # ----------------------------------------------------------------------
-# Checks if an option is a combination of multiple short options.
+# Checks if an argument is a combination of multiple short options.
 #
 # Input:
-# $1 - option as provided on the command line (including leading '-')
+# $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
 is_short_options_combination() {
-	local -r option="$1"
+	local -r argument="$1"
 
-	[[ "${option}" == -[^-]?* ]]
+	[[ "${argument}" == -[^-]?* ]]
 }
 
 is_valid_destination_directory_path() {
@@ -655,13 +655,13 @@ exit_invalid_option() {
 }
 
 # ----------------------------------------------------------------------
-# Issues an error message about a missing option argument for an option
+# Issues an error message about a missing option parameter for an option
 # and exits.
 #
 # Input:
 # $1 - option (including leading '-')
 # ----------------------------------------------------------------------
-exit_missing_option_argument_for_option() {
+exit_missing_option_parameter_for_option() {
 	local -r option="$1"
 
 	if is_long_option "${option}"; then
@@ -675,13 +675,13 @@ exit_missing_option_argument_for_option() {
 }
 
 # ----------------------------------------------------------------------
-# Issues an error message about specifying an option argument for a long
-# option where no argument is allowed and exits.
+# Issues an error message about specifying an option parameter for a
+# long option where no parameter is allowed and exits.
 #
 # Input:
 # $1 - long option (including leading '-')
 # ----------------------------------------------------------------------
-exit_no_option_argument_allowed_for_long_option(){
+exit_no_option_parameter_allowed_for_long_option(){
 	local -r long_option="$1"
 
 	echo_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
@@ -762,7 +762,7 @@ main () {
 	fi
 
 	# ==================================================================
-	# Parse command line options
+	# Parse command line arguments
 	# ==================================================================
 
 	unset option_applicationpath
@@ -770,13 +770,13 @@ main () {
 	local option_genuine="false"
 	local option_nointeraction="false"
 
-	local full_long_option
-	local option_argument
+	local long_option
+	local option_parameter
 
 	# This script requires at least four arguments: Two options with one
-	# option argument each. However, this does not take into account
+	# option parameter each. However, this does not take into account
 	# that one argument might already consist of an option and its
-	# option argument.
+	# option parameter.
 	#
 	# NOTE: This behavior is intended to replicate the behavior of
 	# Apple's command 'createinstallmedia' for creation of a bootable
@@ -796,61 +796,61 @@ main () {
 
 			# Option '--applicationpath'
 			-a* | --a* )
-				full_long_option="--applicationpath"
+				long_option="--applicationpath"
 
-				if is_option_including_option_argument "$1"; then
+				if is_option_including_option_parameter "$1"; then
 					if is_long_option "$1"; then
-						is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
-						option_argument="${1#--*=}"
+						is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+						option_parameter="${1#--*=}"
 					else
-						option_argument="${1#-?}"
+						option_parameter="${1#-?}"
 					fi
 					shift
 				else
 					if is_long_option "$1"; then
-						is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+						is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
 					fi
-					[[ "${2+set}" == "set" ]] || exit_missing_option_argument_for_option "$1"
-					option_argument="$2"
+					[[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
+					option_parameter="$2"
 					shift 2
 				fi
 
-				option_applicationpath="${option_argument}"
+				option_applicationpath="${option_parameter}"
 				;;
 
 			# Option '--destinationpath'
 			-d* | --d* )
-				full_long_option="--destinationpath"
+				long_option="--destinationpath"
 
-				if is_option_including_option_argument "$1"; then
+				if is_option_including_option_parameter "$1"; then
 					if is_long_option "$1"; then
-						is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
-						option_argument="${1#--*=}"
+						is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+						option_parameter="${1#--*=}"
 					else
-						option_argument="${1#-?}"
+						option_parameter="${1#-?}"
 					fi
 					shift
 				else
 					if is_long_option "$1"; then
-						is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+						is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
 					fi
-					[[ "${2+set}" == "set" ]] || exit_missing_option_argument_for_option "$1"
-					option_argument="$2"
+					[[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
+					option_parameter="$2"
 					shift 2
 				fi
 
-				option_destinationpath="${option_argument}"
+				option_destinationpath="${option_parameter}"
 				;;
 
 			# Option '--genuine'
 			-g* | --g* )
-				full_long_option="--genuine"
+				long_option="--genuine"
 
-				if is_long_option_including_option_argument "$1"; then
-					is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
-					exit_no_option_argument_allowed_for_long_option "${1%%=*}"
+				if is_long_option_including_option_parameter "$1"; then
+					is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+					exit_no_option_parameter_allowed_for_long_option "${1%%=*}"
 				elif is_long_option "$1"; then
-					is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+					is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
 					shift
 				elif is_short_options_combination "$1"; then
 					set -- "-${1:2}" "${@:2}"
@@ -863,13 +863,13 @@ main () {
 
 			# Option '--nointeraction'
 			-n* | --n* )
-				full_long_option="--nointeraction"
+				long_option="--nointeraction"
 
-				if is_long_option_including_option_argument "$1"; then
-					is_valid_long_option "${1%%=*}" "${full_long_option}" || exit_invalid_option "$1"
-					exit_no_option_argument_allowed_for_long_option "${1%%=*}"
+				if is_long_option_including_option_parameter "$1"; then
+					is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+					exit_no_option_parameter_allowed_for_long_option "${1%%=*}"
 				elif is_long_option "$1"; then
-					is_valid_long_option "$1" "${full_long_option}" || exit_invalid_option "$1"
+					is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
 					shift
 				elif is_short_options_combination "$1"; then
 					set -- "-${1:2}" "${@:2}"
