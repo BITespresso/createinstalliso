@@ -590,9 +590,9 @@ get_example_installer_application_name() {
 }
 
 create_iso_image() {
-	local source_image="$1"
-	local destination_image="$2"
-	local default_volume_name="$3"
+	local -r source_image="$1"
+	local -r destination_image="$2"
+	local -r default_volume_name="$3"
 
 	is_not_empty "${source_image}" || return 1
 	is_not_empty "${destination_image}" || return 1
