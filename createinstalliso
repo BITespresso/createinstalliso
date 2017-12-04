@@ -599,13 +599,16 @@ get_example_installer_application_name() {
 }
 
 # ----------------------------------------------------------------------
-# Returns the type of an installer application, based on a comparison of
-# some file locations and values in property list files with known types
-# of installer applications. The returned types are:
+# Returns the type of an installer application. The type is determined
+# by checking the presence of some files that are specific to the
+# different installer types.
+#
+# The returned types are:
 #
 # '0' - Installer application type unknown
-# '1' - Installer application type for Mac OS X 10.7 to 10.12
-# '2' - Installer application type for Mac OS X 10.13
+# '1' - Installer application type for Mac OS X 10.7 to 10.8
+# '2' - Installer application type for Mac OS X 10.9 to 10.11
+# '3' - Installer application type for Mac OS X 10.12 to 10.13
 #
 # Input:
 # $1 - path to the installer application
@@ -621,26 +624,14 @@ get_installer_application_type()
 
 	is_not_empty "${installer_application_path}" || return 1
 
-	if is_file "${installer_application_path}/Contents/SharedSupport/BaseSystem.dmg"; then
+	if is_file "${installer_application_path}/Contents/Resources/createinstallmedia"; then
 		if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
-			if get_system_image_url "${installer_application_path}" &> /dev/null; then
-				system_image_url="$(get_system_image_url "${installer_application_path}")"
-				if [[ "${system_image_url}" == "BaseSystem.dmg" ]]; then
-					installer_application_type="2"
-				fi
-			fi
+			installer_application_type="3"
+		else
+			installer_application_type="2"
 		fi
 	else
-		if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
-			if get_system_image_url "${installer_application_path}" &> /dev/null; then
-				system_image_url="$(get_system_image_url "${installer_application_path}")"
-				if [[ "${system_image_url}" == "InstallESD.dmg" ]]; then
-					installer_application_type="1"
-				fi
-			fi
-		else
-			installer_application_type="1"
-		fi
+		installer_application_type="1"
 	fi
 
 	echo "${installer_application_type}"
