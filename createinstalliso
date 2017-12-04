@@ -31,33 +31,33 @@ declare -r -i const_root_uid="0"
 # large integer values correctly. Therefore, this script requires
 # Mac OS X 10.6 Snow Leopard or later.
 declare -r -a const_unsupported_mac_os_x_major_versions=(
-	"10.0"
-	"10.1"
-	"10.2"
-	"10.3"
-	"10.4"
-	"10.5"
+	"10.0"  # Mac OS X Cheetah
+	"10.1"  # Mac OS X Puma
+	"10.2"  # Mac OS X Jaguar
+	"10.3"  # Mac OS X Panther
+	"10.4"  # Mac OS X Tiger
+	"10.5"  # Mac OS X Leopard
 )
 
 # This script has been tested on the following Mac OS X major versions.
 declare -r -a const_supported_mac_os_x_major_versions=(
-	"10.6"
-	"10.7"
-	"10.8"
-	"10.9"
-	"10.10"
-	"10.11"
-	"10.12"
+	"10.6"  # Mac OS X Snow Leopard
+	"10.7"  # Mac OS X Lion
+	"10.8"  # OS X Mountain Lion
+	"10.9"  # OS X Mavericks
+	"10.10" # OS X Yosemite
+	"10.11" # OS X El Capitan
+	"10.12" # macOS Sierra
 )
 
 # This script has been tested with the following installer applications.
 declare -r -a const_supported_installer_application_display_names=(
-	"Install Mac OS X Lion"
-	"Install OS X Mountain Lion"
-	"Install OS X Mavericks"
-	"Install OS X Yosemite"
-	"Install OS X El Capitan"
-	"Install macOS Sierra"
+	"Install Mac OS X Lion"      # 10.7
+	"Install OS X Mountain Lion" # 10.8
+	"Install OS X Mavericks"     # 10.9
+	"Install OS X Yosemite"      # 10.10
+	"Install OS X El Capitan"    # 10.11
+	"Install macOS Sierra"       # 10.12
 )
 
 unset global_exit_message
