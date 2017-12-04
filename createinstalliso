@@ -169,13 +169,19 @@ is_root() {
 is_option_including_option_argument() {
 	local -r option="$1"
 
-	[[ "${option}" == --*=* ]] || [[ "${option}" == -[^-]?* ]]
+	is_long_option_including_option_argument "${option}" || is_short_option_including_option_argument "${option}"
 }
 
 is_long_option_including_option_argument() {
 	local -r option="$1"
 
 	[[ "${option}" == --*=* ]]
+}
+
+is_short_option_including_option_argument() {
+	local -r option="$1"
+
+	[[ "${option}" == -[^-]?* ]]
 }
 
 is_long_option() {
@@ -187,9 +193,10 @@ is_long_option() {
 is_valid_long_option() {
 	local -r long_option="$1"
 	local -r full_long_option="$2"
-	local -r valid_option_regex="^[-[:alnum:]]+$"
 
-	[[ "${long_option}" =~ ${valid_option_regex} && "${full_long_option}" == "${long_option}"* ]]
+	is_long_option "${long_option}" || return 1
+
+	[[ "${full_long_option}" == "${long_option}"* ]]
 }
 
 is_short_options_combination() {
