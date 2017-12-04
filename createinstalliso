@@ -534,15 +534,6 @@ get_disk_image_total_non_empty_bytes() {
 	get_plist_value ":Size Information:Total Non-Empty Bytes" "${plist_file}"
 }
 
-get_file_size_in_bytes() {
-	local -r file="$1"
-
-	is_not_empty "${file}" || return 1
-	is_file "${file}" || return 1
-
-	stat -f %z "${file}"
-}
-
 # ----------------------------------------------------------------------
 # Returns the absolute logical path to a file or directory.
 #
@@ -1068,21 +1059,28 @@ main () {
 
 	local base_system_dmg_total_bytes
 	local install_esd_dmg_total_non_empty_bytes
-	local base_system_dmg_file_size_in_bytes
 
 	base_system_dmg_total_bytes="$(get_disk_image_total_bytes "${base_system_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total bytes of disk image ${base_system_dmg_file}."; }
 	install_esd_dmg_total_non_empty_bytes="$(get_disk_image_total_non_empty_bytes "${install_esd_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get total non-empty bytes of disk image ${install_esd_dmg_file}."; }
-	base_system_dmg_file_size_in_bytes="$(get_file_size_in_bytes "${base_system_dmg_file}")" || { echo 1>&2; exit_with_error "Couldn't get size of file ${base_system_dmg_file}."; }
 
 	# Calculate the required size of the writable installer disk image.
-	# The size of the writable installer disk image does not affect the
-	# size of the final ISO image.
 	#
-	# The writable installer disk image needs to be large enough to
-	# store the BaseSystem.dmg from which it was created and the
-	# remaining other files in the InstallESD.dmg image (i.e. its total
-	# non empty bytes minus the size of the BaseSystem.dmg file).
-	(( writable_installer_disk_image_size = base_system_dmg_total_bytes + (install_esd_dmg_total_non_empty_bytes - base_system_dmg_file_size_in_bytes) ))
+	# The size of the writable installer disk image must be increased
+	# beyond its current size to store the Packages directory contained
+	# in the InstallESD.dmg disk image, and the BaseSystem.dmg file
+	# which both will be copied to the writable disk image.
+	#
+	# The Packages directory and the file BaseSystem.dmg are both
+	# contained in the InstallESD.dmg disk image and typically account
+	# for more than 98% of the content of the InstallESD.dmg disk image.
+	#
+	# Therefore, the total number of non empty bytes in the
+	# InstallESD.dmg disk image can be used as a good guess for the
+	# required size increase of the writable installer disk image.
+	#
+	# NOTE: The size of the writable installer disk image does not
+	# affect the size of the final ISO image.
+	(( writable_installer_disk_image_size = base_system_dmg_total_bytes + install_esd_dmg_total_non_empty_bytes ))
 
 	# Add 10% for potential overhead
 	(( writable_installer_disk_image_size = writable_installer_disk_image_size + (writable_installer_disk_image_size / 10) ))
