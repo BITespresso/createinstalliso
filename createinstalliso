@@ -65,6 +65,10 @@ unset global_writable_installer_disk_image_mountpoint
 unset global_incomplete_iso_destination_file
 declare -i global_exit_with_error_exit_status="1"
 
+# ======================================================================
+# Helper functions
+# ======================================================================
+
 exit_handler() {
 	trap - EXIT
 	cleanup
@@ -500,6 +504,10 @@ exit_with_error() {
 	exit "${global_exit_with_error_exit_status:-1}"
 }
 
+# ======================================================================
+# Main function
+# ======================================================================
+
 main () {
 	set -o errexit
 	set -o errtrace
@@ -508,6 +516,10 @@ main () {
 
 	trap "exit_handler" EXIT
 	trap "signal_handler" SIGHUP SIGINT SIGQUIT SIGPIPE SIGTERM
+
+	# ==================================================================
+	# Check operating system requirements
+	# ==================================================================
 
 	local os_name
 	local mac_os_x_major_version
@@ -529,6 +541,10 @@ main () {
 	if ! is_supported_mac_os_x_major_version "${mac_os_x_major_version}"; then
 		echo_warning "This tool has not been tested on Mac OS X ${mac_os_x_major_version}."
 	fi
+
+	# ==================================================================
+	# Parse command line options
+	# ==================================================================
 
 	unset option_applicationpath
 	unset option_destinationpath
@@ -661,6 +677,10 @@ main () {
 		esac
 	done
 
+	# ==================================================================
+	# Verify command line options
+	# ==================================================================
+
 	if [[ "${option_applicationpath+set}" != "set" || "${option_destinationpath+set}" != "set" ]]; then
 		echo_error "You must specify both the destination directory and install application path."
 		exit 255
@@ -675,6 +695,10 @@ main () {
 		echo_error "${option_applicationpath} does not appear to be a valid OS installer application."
 		exit 253
 	fi
+
+	# ==================================================================
+	# Perform required user interactions
+	# ==================================================================
 
 	local absolute_installer_application_path
 	local absolute_destination_directory_path
@@ -708,6 +732,10 @@ main () {
 
 		rm -rf "${iso_destination_file}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
 	fi
+
+	# ==================================================================
+	# Create writable disk image from BaseSystem.dmg
+	# ==================================================================
 
 	local install_esd_dmg_file
 	local install_esd_dmg_shadow
@@ -745,6 +773,10 @@ main () {
 		rm -f "${tmp_installer_disk_image_file}" &> /dev/null
 	fi
 
+	# ==================================================================
+	# Resize writable disk image
+	# ==================================================================
+
 	local base_system_dmg_total_bytes
 	local install_esd_dmg_total_non_empty_bytes
 	local base_system_dmg_file_size_in_bytes
@@ -762,6 +794,10 @@ main () {
 	hdiutil attach "${writable_installer_disk_image_file}" -readwrite -mountpoint "${global_writable_installer_disk_image_mountpoint}" -nobrowse &> /dev/null || { echo 1>&2; exit_with_error "Couldn't mount writable disk image."; }
 	echo "100%..." 1>&2
 
+	# ==================================================================
+	# Check Mac OS X version contained in installer application
+	# ==================================================================
+
 	local installer_mac_os_x_major_version
 
 	installer_mac_os_x_major_version="$(get_installer_mac_os_x_major_version "${global_writable_installer_disk_image_mountpoint}")" || exit_with_error "Couldn't get Mac OS X version contained in OS installer application."
@@ -769,6 +805,10 @@ main () {
 	if ! is_supported_installer_mac_os_x_major_version "${installer_mac_os_x_major_version}"; then
 		echo_warning "This tool has not been tested with the Mac OS X ${installer_mac_os_x_major_version} installer."
 	fi
+
+	# ==================================================================
+	# Copy installer files to disk image
+	# ==================================================================
 
 	echo "Copying installer files to disk image..."
 	cp -p "${base_system_dmg_file}" "${global_writable_installer_disk_image_mountpoint}/" &> /dev/null || exit_with_error "The copy of BaseSystem.dmg failed."
@@ -779,6 +819,10 @@ main () {
 	cp -pPR "${global_install_esd_dmg_mountpoint}/Packages" "${global_writable_installer_disk_image_mountpoint}/System/Installation/" &> /dev/null || exit_with_error "The copy of Packages failed."
 	echo "Copy complete."
 
+	# ==================================================================
+	# Make disk image bootable
+	# ==================================================================
+
 	local core_services_directory
 
 	echo "Making disk image bootable..."
@@ -787,6 +831,10 @@ main () {
 
 	hdiutil detach "${global_writable_installer_disk_image_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount writable disk image."
 	unset global_writable_installer_disk_image_mountpoint
+
+	# ==================================================================
+	# Create ISO image
+	# ==================================================================
 
 	local source_device_id
 	local destination_device_id
