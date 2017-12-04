@@ -50,23 +50,14 @@ declare -r -a const_supported_mac_os_x_major_versions=(
 	"10.12"
 )
 
-# This script has been tested with the installer applications for the
-# following Mac OS X major versions.
-declare -r -a const_supported_installer_mac_os_x_major_versions=(
-	"10.7"
-	"10.8"
-	"10.9"
-	"10.10"
-	"10.11"
-	"10.12"
-)
-declare -r -a const_example_installer_application_names=(
-	"Install Mac OS X Lion.app"
-	"Install OS X Mountain Lion.app"
-	"Install OS X Mavericks.app"
-	"Install OS X Yosemite.app"
-	"Install OS X El Capitan.app"
-	"Install macOS Sierra.app"
+# This script has been tested with the following installer applications.
+declare -r -a const_supported_installer_application_display_names=(
+	"Install Mac OS X Lion"
+	"Install OS X Mountain Lion"
+	"Install OS X Mavericks"
+	"Install OS X Yosemite"
+	"Install OS X El Capitan"
+	"Install macOS Sierra"
 )
 
 unset global_exit_message
@@ -329,10 +320,10 @@ is_supported_mac_os_x_major_version() {
 	is_array_item "${mac_os_x_major_version}" "const_supported_mac_os_x_major_versions"
 }
 
-is_supported_installer_mac_os_x_major_version() {
-	local -r mac_os_x_major_version="$1"
+is_supported_installer_application_display_name() {
+	local -r installer_application_display_name="$1"
 
-	is_array_item "${mac_os_x_major_version}" "const_supported_installer_mac_os_x_major_versions"
+	is_array_item "${installer_application_display_name}" "const_supported_installer_application_display_names"
 }
 
 # ----------------------------------------------------------------------
@@ -478,29 +469,6 @@ get_installer_application_display_name() {
 }
 
 # ----------------------------------------------------------------------
-# Returns the major version of the Mac OS X operating system contained
-# in the installer application.
-#
-# Output:
-# Mac OS X major version
-# ----------------------------------------------------------------------
-get_installer_mac_os_x_major_version() {
-	local -r global_writable_installer_disk_image_mountpoint="$1"
-	local installer_mac_os_x_version
-	local installer_mac_os_x_major_version
-
-	is_not_empty "${global_writable_installer_disk_image_mountpoint}" || return 1
-
-	installer_mac_os_x_version="$(get_plist_value ":ProductVersion" "${global_writable_installer_disk_image_mountpoint}/System/Library/CoreServices/SystemVersion.plist")" || return 1
-	is_valid_mac_os_x_version "${installer_mac_os_x_version}" || return 1
-
-	installer_mac_os_x_major_version="$(get_mac_os_x_major_version_from_mac_os_x_version "${installer_mac_os_x_version}")" || return 1
-
-	echo "${installer_mac_os_x_major_version}"
-	return 0
-}
-
-# ----------------------------------------------------------------------
 # Returns the total number of bytes in a disk image.
 #
 # Input:
@@ -606,13 +574,13 @@ get_user_consent() {
 }
 
 get_example_installer_application_name() {
-	local -r number_of_elements="${#const_example_installer_application_names[@]}"
-	local example_installer_application_name="${const_example_installer_application_names[${number_of_elements}-1]}"
+	local -r number_of_elements="${#const_supported_installer_application_display_names[@]}"
+	local example_installer_application_name="${const_supported_installer_application_display_names[${number_of_elements}-1]}.app"
 	local i
 
 	for (( i = number_of_elements - 1; i >= 0; i-- )); do
-		if is_valid_installer_application_path "/Applications/${const_example_installer_application_names[${i}]}"; then
-			example_installer_application_name="${const_example_installer_application_names[${i}]}"
+		if is_valid_installer_application_path "/Applications/${const_supported_installer_application_display_names[${i}]}.app"; then
+			example_installer_application_name="${const_supported_installer_application_display_names[${i}]}.app"
 			break
 		fi
 	done
@@ -924,19 +892,28 @@ main () {
 	fi
 
 	# ==================================================================
-	# Perform required user interactions
+	# Check installer application requirements
 	# ==================================================================
 
 	local absolute_installer_application_path
 	local absolute_destination_directory_path
 	local installer_application_display_name
-	local iso_destination_file
-	local type_of_existing_destination_file
 
 	absolute_installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
 	absolute_destination_directory_path="$(get_absolute_logical_path "${option_destinationpath}")" || exit_with_error "Couldn't get absolute path for ${option_destinationpath}."
 
-	installer_application_display_name="$(get_installer_application_display_name "${absolute_installer_application_path}")" || exit_with_error "Couldn't get display name for OS installer application."
+	installer_application_display_name="$(get_installer_application_display_name "${absolute_installer_application_path}")" || exit_with_error "Couldn't get display name of installer application."
+
+	if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
+		echo_warning "${installer_application_display_name} is not a supported installer."
+	fi
+
+	# ==================================================================
+	# Perform required user interactions
+	# ==================================================================
+
+	local iso_destination_file
+	local type_of_existing_destination_file
 
 	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
 
@@ -1050,18 +1027,6 @@ main () {
 
 	hdiutil attach "${writable_installer_disk_image_file}" -readwrite -mountpoint "${global_writable_installer_disk_image_mountpoint}" -nobrowse &> /dev/null || { echo 1>&2; exit_with_error "Couldn't mount writable disk image."; }
 	echo "100%..." 1>&2
-
-	# ==================================================================
-	# Check Mac OS X version contained in installer application
-	# ==================================================================
-
-	local installer_mac_os_x_major_version
-
-	installer_mac_os_x_major_version="$(get_installer_mac_os_x_major_version "${global_writable_installer_disk_image_mountpoint}")" || exit_with_error "Couldn't get Mac OS X version contained in OS installer application."
-
-	if ! is_supported_installer_mac_os_x_major_version "${installer_mac_os_x_major_version}"; then
-		echo_warning "This tool has not been tested with the Mac OS X ${installer_mac_os_x_major_version} installer."
-	fi
 
 	# ==================================================================
 	# Copy installer files to disk image
