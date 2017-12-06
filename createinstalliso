@@ -278,10 +278,75 @@ is_valid_destination_directory_path() {
 
 is_valid_installer_application_path() {
 	local -r installer_application_path="$1"
+	local -i installer_application_type="0"
+
+	local cf_bundle_short_version_string
+	local valid_cf_bundle_short_version_string_regex='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
+
+	local cf_bundle_identifier
+	local valid_cf_bundle_identifier_regex='^com\.apple\.InstallAssistant\.[a-zA-Z0-9.-]+$'
+
+	local system_image_info_url
 
 	is_not_empty "${installer_application_path}" || return 1
+	is_directory "${installer_application_path}" || return 1
 
-	is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || return 1
+
+	case "${installer_application_type}" in
+
+		# '1' - Installer application type for Mac OS X 10.7 to 10.8
+		1 )
+			is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg" || return 1
+
+			return 0
+			;;
+
+		# '2' - Installer application type for Mac OS X 10.9 to 10.11
+		2 )
+			is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg" || return 1
+			is_file "${installer_application_path}/Contents/SharedSupport/OSInstall.mpkg" || return 1
+			is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
+
+			if is_file "${installer_application_path}/Contents/Info.plist"; then
+				cf_bundle_short_version_string="$(get_cf_bundle_short_version_string "${installer_application_path}")" || return 1
+				[[ "${cf_bundle_short_version_string}" =~ ${valid_cf_bundle_short_version_string_regex} ]] || return 1
+
+				cf_bundle_identifier="$(get_cf_bundle_identifier "${installer_application_path}")" || return 1
+				[[ "${cf_bundle_identifier}" =~ ${valid_cf_bundle_identifier_regex} ]] || return 1
+			else
+				return 1
+			fi
+
+			return 0
+			;;
+
+		# '3' - Installer application type for Mac OS X 10.12 to 10.13
+		3 )
+			is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
+
+			if is_file "${installer_application_path}/Contents/Info.plist"; then
+				cf_bundle_short_version_string="$(get_cf_bundle_short_version_string "${installer_application_path}")" || return 1
+				[[ "${cf_bundle_short_version_string}" =~ ${valid_cf_bundle_short_version_string_regex} ]] || return 1
+
+				cf_bundle_identifier="$(get_cf_bundle_identifier "${installer_application_path}")" || return 1
+				[[ "${cf_bundle_identifier}" =~ ${valid_cf_bundle_identifier_regex} ]] || return 1
+			else
+				return 1
+			fi
+
+			if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
+				system_image_info_url="$(get_system_image_info_url "${installer_application_path}")" || return 1
+				is_file "${installer_application_path}/Contents/SharedSupport/${system_image_info_url}" || return 1
+			else
+				return 1
+			fi
+
+			return 0
+			;;
+
+	esac
+	return 1
 }
 
 # ----------------------------------------------------------------------
