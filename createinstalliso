@@ -278,6 +278,7 @@ is_valid_destination_directory_path() {
 
 is_valid_installer_application_path() {
 	local -r installer_application_path="$1"
+	local installer_application_display_name=""
 	local -i installer_application_type="0"
 
 	local cf_bundle_short_version_string
@@ -290,6 +291,9 @@ is_valid_installer_application_path() {
 
 	is_not_empty "${installer_application_path}" || return 1
 	is_directory "${installer_application_path}" || return 1
+
+	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || return 1
+	is_not_empty "${installer_application_display_name}" || return 1
 
 	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || return 1
 
