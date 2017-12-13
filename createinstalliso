@@ -292,6 +292,9 @@ is_valid_installer_application_path() {
 	is_not_empty "${installer_application_path}" || return 1
 	is_directory "${installer_application_path}" || return 1
 
+	# Check if the installer application display name can be retrieved.
+	# The installer application display name is required to verify the
+	# compatibility of the script.
 	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || return 1
 	is_not_empty "${installer_application_display_name}" || return 1
 
@@ -301,6 +304,8 @@ is_valid_installer_application_path() {
 
 		# '1' - Installer application type for Mac OS X 10.7 to 10.8
 		1 )
+			# This file is required because it will be used as source
+			# to create the installer disk image.
 			is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg" || return 1
 
 			return 0
@@ -308,9 +313,15 @@ is_valid_installer_application_path() {
 
 		# '2' - Installer application type for Mac OS X 10.9 to 10.11
 		2 )
+			# Apple's command 'createinstallmedia' is required because
+			# it will be used to create the installer disk image.
+			is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
+
+			# All subsequent checks are the same as those performed by
+			# Apple's command 'createinstallmedia' to determine if the
+			# OS installer application is valid.
 			is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg" || return 1
 			is_file "${installer_application_path}/Contents/SharedSupport/OSInstall.mpkg" || return 1
-			is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
 
 			if is_file "${installer_application_path}/Contents/Info.plist"; then
 				cf_bundle_short_version_string="$(get_cf_bundle_short_version_string "${installer_application_path}")" || return 1
@@ -327,8 +338,13 @@ is_valid_installer_application_path() {
 
 		# '3' - Installer application type for Mac OS X 10.12 to 10.13
 		3 )
+			# Apple's command 'createinstallmedia' is required because
+			# it will be used to create the installer disk image.
 			is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
 
+			# All subsequent checks are the same as those performed by
+			# Apple's command 'createinstallmedia' to determine if the
+			# OS installer application is valid.
 			if is_file "${installer_application_path}/Contents/Info.plist"; then
 				cf_bundle_short_version_string="$(get_cf_bundle_short_version_string "${installer_application_path}")" || return 1
 				[[ "${cf_bundle_short_version_string}" =~ ${valid_cf_bundle_short_version_string_regex} ]] || return 1
