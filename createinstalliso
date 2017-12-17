@@ -1015,6 +1015,25 @@ main () {
 		exit 253
 	fi
 
+	# ==================================================================
+	# Initialization
+	# ==================================================================
+
+	local installer_application_path
+	local destination_directory_path
+	local installer_application_display_name
+	local -i installer_application_type
+	local iso_destination_file
+
+	installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
+	destination_directory_path="$(get_absolute_logical_path "${option_destinationpath}")" || exit_with_error "Couldn't get absolute path for ${option_destinationpath}."
+
+	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_error "Couldn't get installer application display name."
+	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_error "Couldn't get installer application type."
+	iso_destination_file="${destination_directory_path}/${installer_application_display_name}.iso"
+
+	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
+
 	exit 0
 }
 
