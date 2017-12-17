@@ -62,8 +62,6 @@ declare -r -a const_supported_installer_application_display_names=(
 
 unset global_exit_message
 unset global_tmp_directory
-unset global_install_esd_dmg_mountpoint
-unset global_writable_installer_disk_image_mountpoint
 unset global_incomplete_iso_destination_file
 declare -i global_exit_with_error_exit_status="1"
 
@@ -93,14 +91,7 @@ signal_handler() {
 
 cleanup() {
 	if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
-		if is_not_empty "${global_writable_installer_disk_image_mountpoint-}" && is_existing "${global_writable_installer_disk_image_mountpoint}"; then
-			hdiutil detach "${global_writable_installer_disk_image_mountpoint}" -force &> /dev/null && unset global_writable_installer_disk_image_mountpoint
-		fi
-		if is_not_empty "${global_install_esd_dmg_mountpoint-}" && is_existing "${global_install_esd_dmg_mountpoint}"; then
-			hdiutil detach "${global_install_esd_dmg_mountpoint}" -force &> /dev/null && unset global_install_esd_dmg_mountpoint
-		fi
-
-	    rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
+		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
 	fi
 
 	# Remove the incomplete destination file if the user interrupts the
