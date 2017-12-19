@@ -1042,6 +1042,40 @@ main () {
 		echo_warning "${installer_application_display_name} is not a supported installer."
 	fi
 
+	# ==================================================================
+	# Perform required user interactions
+	# ==================================================================
+
+	local type_of_existing_destination_file
+
+	if is_existing "${iso_destination_file}"; then
+		if is_file "${iso_destination_file}"; then
+			type_of_existing_destination_file="file"
+		else
+			type_of_existing_destination_file="directory"
+		fi
+		if [[ ! "${option_nointeraction}" == "true" ]]; then
+			echo "Ready to start."
+			echo "To continue we need to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
+			if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
+				echo -n "Operation canceled."
+				exit 0
+			fi
+		fi
+
+		rm -rf "${iso_destination_file}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
+	fi
+
+	# Once the script has reached this point of execution, it will
+	# return with exit status zero in case of an error and issue an exit
+	# message before exiting.
+	#
+	# NOTE: This behavior is intended to replicate the behavior of
+	# Apple's command 'createinstallmedia' for creation of a bootable
+	# installer USB flash drive or other volume.
+	global_exit_with_error_exit_status="0"
+	global_exit_message="Done."
+
 	exit 0
 }
 
