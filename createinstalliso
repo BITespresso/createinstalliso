@@ -1034,6 +1034,14 @@ main () {
 
 	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
 
+	# ==================================================================
+	# Check installer application requirements
+	# ==================================================================
+
+	if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
+		echo_warning "${installer_application_display_name} is not a supported installer."
+	fi
+
 	exit 0
 }
 
