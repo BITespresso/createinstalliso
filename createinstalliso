@@ -115,11 +115,10 @@ echo_error() {
 
 echo_error_usage() {
 	cat <<-EOF 1>&2
-	Usage: ${const_script_name} --destinationpath <path to destination directory> --applicationpath <path to OS installer application> [--genuine] [--nointeraction]
+	Usage: ${const_script_name} --destinationpath <path to destination directory> --applicationpath <path to OS installer application> [--nointeraction]
 
 	Arguments--destinationpath, A path to a directory where the installer ISO image will be created.
 	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
-	--genuine, Create an ISO image that is most close to Apple's Install DVD, but potentially less compatible with some BIOS/UEFI.
 	--nointeraction, Delete an existing file (or directory) in the destination directory when it has the same name as the target ISO file without prompting for confirmation.
 
 	Example: ${const_script_name} --destinationpath ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
@@ -859,7 +858,6 @@ main () {
 
 	unset option_applicationpath
 	unset option_destinationpath
-	local option_genuine="false"
 	local option_nointeraction="false"
 
 	local long_option
@@ -932,25 +930,6 @@ main () {
 				fi
 
 				option_destinationpath="${option_parameter}"
-				;;
-
-			# Option '--genuine'
-			-g* | --g* )
-				long_option="--genuine"
-
-				if is_long_option_including_option_parameter "$1"; then
-					is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
-					exit_no_option_parameter_allowed_for_long_option "${1%%=*}"
-				elif is_long_option "$1"; then
-					is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
-					shift
-				elif is_short_options_combination "$1"; then
-					set -- "-${1:2}" "${@:2}"
-				else
-					shift
-				fi
-
-				option_genuine="true"
 				;;
 
 			# Option '--nointeraction'
