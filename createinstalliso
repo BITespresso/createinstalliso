@@ -271,13 +271,13 @@ is_valid_installer_application_path() {
 	local installer_application_display_name=""
 	local -i installer_application_type="0"
 
-	local cf_bundle_short_version_string
-	local valid_cf_bundle_short_version_string_regex='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
+	local installer_application_short_version_string
+	local valid_installer_application_short_version_string_regex='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
 
-	local cf_bundle_identifier
-	local valid_cf_bundle_identifier_regex='^com\.apple\.InstallAssistant\.[a-zA-Z0-9.-]+$'
+	local installer_application_identifier
+	local valid_installer_application_identifier_regex='^com\.apple\.InstallAssistant\.[a-zA-Z0-9.-]+$'
 
-	local system_image_info_url
+	local system_image_url
 
 	is_not_empty "${installer_application_path}" || return 1
 	is_directory "${installer_application_path}" || return 1
@@ -314,11 +314,11 @@ is_valid_installer_application_path() {
 			is_file "${installer_application_path}/Contents/SharedSupport/OSInstall.mpkg" || return 1
 
 			if is_file "${installer_application_path}/Contents/Info.plist"; then
-				cf_bundle_short_version_string="$(get_cf_bundle_short_version_string "${installer_application_path}")" || return 1
-				[[ "${cf_bundle_short_version_string}" =~ ${valid_cf_bundle_short_version_string_regex} ]] || return 1
+				installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
+				[[ "${installer_application_short_version_string}" =~ ${valid_installer_application_short_version_string_regex} ]] || return 1
 
-				cf_bundle_identifier="$(get_cf_bundle_identifier "${installer_application_path}")" || return 1
-				[[ "${cf_bundle_identifier}" =~ ${valid_cf_bundle_identifier_regex} ]] || return 1
+				installer_application_identifier="$(get_installer_application_identifier "${installer_application_path}")" || return 1
+				[[ "${installer_application_identifier}" =~ ${valid_installer_application_identifier_regex} ]] || return 1
 			else
 				return 1
 			fi
@@ -336,18 +336,18 @@ is_valid_installer_application_path() {
 			# Apple's command 'createinstallmedia' to determine if the
 			# OS installer application is valid.
 			if is_file "${installer_application_path}/Contents/Info.plist"; then
-				cf_bundle_short_version_string="$(get_cf_bundle_short_version_string "${installer_application_path}")" || return 1
-				[[ "${cf_bundle_short_version_string}" =~ ${valid_cf_bundle_short_version_string_regex} ]] || return 1
+				installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
+				[[ "${installer_application_short_version_string}" =~ ${valid_installer_application_short_version_string_regex} ]] || return 1
 
-				cf_bundle_identifier="$(get_cf_bundle_identifier "${installer_application_path}")" || return 1
-				[[ "${cf_bundle_identifier}" =~ ${valid_cf_bundle_identifier_regex} ]] || return 1
+				installer_application_identifier="$(get_installer_application_identifier "${installer_application_path}")" || return 1
+				[[ "${installer_application_identifier}" =~ ${valid_installer_application_identifier_regex} ]] || return 1
 			else
 				return 1
 			fi
 
 			if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
-				system_image_info_url="$(get_system_image_info_url "${installer_application_path}")" || return 1
-				is_file "${installer_application_path}/Contents/SharedSupport/${system_image_info_url}" || return 1
+				system_image_url="$(get_system_image_url "${installer_application_path}")" || return 1
+				is_file "${installer_application_path}/Contents/SharedSupport/${system_image_url}" || return 1
 			else
 				return 1
 			fi
@@ -541,6 +541,42 @@ get_installer_application_display_name() {
 	is_not_empty "${installer_application_path}" || return 1
 
 	get_plist_value ":CFBundleDisplayName" "${installer_application_path}/Contents/Info.plist"
+}
+
+# ----------------------------------------------------------------------
+# Returns the short version string of an installer application.
+#
+# Input:
+# $1 - path to the installer application
+#
+# Output:
+# short version string
+# ----------------------------------------------------------------------
+get_installer_application_short_version_string()
+{
+	local -r installer_application_path="$1"
+
+	is_not_empty "${installer_application_path}" || return 1
+
+	get_plist_value ":CFBundleShortVersionString" "${installer_application_path}/Contents/Info.plist"
+}
+
+# ----------------------------------------------------------------------
+# Returns the identifier of an installer application.
+#
+# Input:
+# $1 - path to the installer application
+#
+# Output:
+# identifier
+# ----------------------------------------------------------------------
+get_installer_application_identifier()
+{
+	local -r installer_application_path="$1"
+
+	is_not_empty "${installer_application_path}" || return 1
+
+	get_plist_value ":CFBundleIdentifier" "${installer_application_path}/Contents/Info.plist"
 }
 
 # ----------------------------------------------------------------------
