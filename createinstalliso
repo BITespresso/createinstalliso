@@ -130,12 +130,6 @@ EOF
 	return 0
 }
 
-is_empty() {
-	local -r string="$1"
-
-	[[ -z "${string}" ]]
-}
-
 is_not_empty() {
 	local -r string="$1"
 
@@ -595,54 +589,6 @@ get_system_image_url()
 	is_not_empty "${installer_application_path}" || return 1
 
 	get_plist_value ":System Image Info:URL" "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"
-}
-
-# ----------------------------------------------------------------------
-# Returns the total number of bytes in a disk image.
-#
-# Input:
-# $1 - disk image file
-# global_tmp_directory - temporary directory
-#
-# Output:
-# total number of bytes in the disk image
-# ----------------------------------------------------------------------
-get_disk_image_total_bytes() {
-	local -r disk_image_file="$1"
-	local plist_file
-
-	is_not_empty "${disk_image_file}" || return 1
-	is_not_empty "${global_tmp_directory-}" || return 1
-
-	plist_file="${disk_image_file##*/}"
-	plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
-	hdiutil imageinfo "${disk_image_file}" -plist > "${plist_file}" 2> /dev/null || return 1
-
-	get_plist_value ":Size Information:Total Bytes" "${plist_file}"
-}
-
-# ----------------------------------------------------------------------
-# Returns the total number of non empty bytes in a disk image.
-#
-# Input:
-# $1 - disk image file
-# global_tmp_directory - temporary directory
-#
-# Output:
-# total number of non empty bytes in the disk image
-# ----------------------------------------------------------------------
-get_disk_image_total_non_empty_bytes() {
-	local -r disk_image_file="$1"
-	local plist_file
-
-	is_not_empty "${disk_image_file}" || return 1
-	is_not_empty "${global_tmp_directory-}" || return 1
-
-	plist_file="${disk_image_file##*/}"
-	plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
-	hdiutil imageinfo "${disk_image_file}" -plist > "${plist_file}" 2> /dev/null || return 1
-
-	get_plist_value ":Size Information:Total Non-Empty Bytes" "${plist_file}"
 }
 
 # ----------------------------------------------------------------------
