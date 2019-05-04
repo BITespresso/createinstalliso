@@ -800,7 +800,7 @@ exit_with_error() {
 # Main function
 # ======================================================================
 
-main () {
+main() {
 	set -o errexit
 	set -o errtrace
 	set -o nounset
