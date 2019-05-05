@@ -62,7 +62,7 @@ declare -r -a const_supported_installer_application_display_names=(
 
 unset global_exit_message
 unset global_tmp_directory
-unset global_incomplete_iso_destination_file
+unset global_incomplete_iso_destination_image
 declare -i global_exit_with_error_exit_status="1"
 
 # ======================================================================
@@ -94,10 +94,10 @@ cleanup() {
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
 	fi
 
-	# Remove the incomplete destination file if the user interrupts the
-	# script while creating the final ISO file.
-	if is_not_empty "${global_incomplete_iso_destination_file-}" && is_existing "${global_incomplete_iso_destination_file}"; then
-		rm -rf "${global_incomplete_iso_destination_file}" &> /dev/null && unset global_incomplete_iso_destination_file
+	# Remove the incomplete destination image if the user interrupts the
+	# script while creating the final ISO image.
+	if is_not_empty "${global_incomplete_iso_destination_image-}" && is_existing "${global_incomplete_iso_destination_image}"; then
+		rm -rf "${global_incomplete_iso_destination_image}" &> /dev/null && unset global_incomplete_iso_destination_image
 	fi
 	return 0
 }
@@ -119,7 +119,7 @@ echo_error_usage() {
 
 	Arguments--destinationpath, A path to a directory where the installer ISO image will be created.
 	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
-	--nointeraction, Delete an existing file (or directory) in the destination directory when it has the same name as the target ISO file without prompting for confirmation.
+	--nointeraction, Delete an existing file (or directory) in the destination directory when it has the same name as the target ISO image without prompting for confirmation.
 
 	Example: ${const_script_name} --destinationpath ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
 EOF
@@ -984,14 +984,14 @@ main() {
 	local destination_directory_path
 	local installer_application_display_name
 	local -i installer_application_type
-	local iso_destination_file
+	local iso_destination_image
 
 	installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
 	destination_directory_path="$(get_absolute_logical_path "${option_destinationpath}")" || exit_with_error "Couldn't get absolute path for ${option_destinationpath}."
 
 	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_error "Couldn't get installer application display name."
 	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_error "Couldn't get installer application type."
-	iso_destination_file="${destination_directory_path}/${installer_application_display_name}.iso"
+	iso_destination_image="${destination_directory_path}/${installer_application_display_name}.iso"
 
 	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
 
@@ -1007,24 +1007,24 @@ main() {
 	# Perform required user interactions
 	# ==================================================================
 
-	local type_of_existing_destination_file
+	local type_of_existing_destination
 
-	if is_existing "${iso_destination_file}"; then
-		if is_file "${iso_destination_file}"; then
-			type_of_existing_destination_file="file"
+	if is_existing "${iso_destination_image}"; then
+		if is_file "${iso_destination_image}"; then
+			type_of_existing_destination="file"
 		else
-			type_of_existing_destination_file="directory"
+			type_of_existing_destination="directory"
 		fi
 		if [[ ! "${option_nointeraction}" == "true" ]]; then
 			echo "Ready to start."
-			echo "To continue we need to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
+			echo "To continue we need to delete the ${type_of_existing_destination} ${iso_destination_image}."
 			if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
 				echo -n "Operation canceled."
 				exit 0
 			fi
 		fi
 
-		rm -rf "${iso_destination_file}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_destination_file} ${iso_destination_file}."
+		rm -rf "${iso_destination_image}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_destination} ${iso_destination_image}."
 	fi
 
 	# Once the script has reached this point of execution, it will
