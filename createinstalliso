@@ -1037,6 +1037,39 @@ main() {
 	global_exit_with_error_exit_status="0"
 	global_exit_message="Done."
 
+	# ==================================================================
+	# Create source image for ISO image
+	# ==================================================================
+
+	local iso_source_image
+
+	case "${installer_application_type}" in
+
+		# '1' - Installer application type for Mac OS X 10.7 to 10.8
+		1 )
+			iso_source_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+			;;
+
+		# '2' - Installer application type for Mac OS X 10.9 to 10.11
+		2 )
+			;;
+
+		# '3' - Installer application type for Mac OS X 10.12 to 10.13
+		3 )
+			;;
+
+	esac
+
+	# ==================================================================
+	# Create ISO image
+	# ==================================================================
+
+	echo "Creating ISO image..."
+	global_incomplete_iso_destination_image="${iso_destination_image}"
+	create_iso_image "${iso_source_image}" "${iso_destination_image}" "${installer_application_display_name}" || exit_with_error "Failed to create ISO image."
+	unset global_incomplete_iso_destination_image
+	echo "Create complete."
+
 	exit 0
 }
 
