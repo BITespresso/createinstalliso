@@ -640,7 +640,7 @@ get_user_consent() {
 	local -r yes_regex='^[yY].*$'
 
 	echo -n "${prompt}"
-	input="$(IFS=""; read -r input; echo "${input}")"
+	IFS= read -r input
 
 	[[ "${input}" =~ ${yes_regex} ]]
 }
