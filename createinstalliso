@@ -1027,7 +1027,7 @@ main() {
 			echo "Ready to start."
 			echo "To continue we need to delete the ${type_of_existing_destination} ${iso_destination_image}."
 			if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
-				echo -n "Operation canceled."
+				echo "Operation canceled."
 				exit 0
 			fi
 		fi
