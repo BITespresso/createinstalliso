@@ -122,7 +122,8 @@ echo_error_usage() {
 	cat <<-EOF 1>&2
 	Usage: ${const_script_name} --destinationpath <path to destination directory> --applicationpath <path to OS installer application> [--nointeraction]
 
-	Arguments--destinationpath, A path to a directory where the installer ISO image will be created.
+	Arguments
+	--destinationpath, A path to a directory where the installer ISO image will be created.
 	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
 	--nointeraction, Delete an existing file (or directory) in the destination directory when it has the same name as the target ISO image without prompting for confirmation.
 
