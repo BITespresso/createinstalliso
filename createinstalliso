@@ -108,7 +108,7 @@ cleanup() {
 }
 
 echo_warning() {
-	echo -n "+++ WARNING: " 1>&2
+	echo -n "WARNING: " 1>&2
 	echo "$@" 1>&2
 	return 0
 }
