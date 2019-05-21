@@ -62,7 +62,7 @@ declare -r -a const_supported_installer_application_display_names=(
 
 unset global_exit_message
 unset global_tmp_directory
-unset global_installmedia_device_node
+unset global_install_media_device_node
 unset global_incomplete_iso_destination_image
 declare -i global_exit_with_error_exit_status="1"
 
@@ -92,8 +92,8 @@ signal_handler() {
 
 cleanup() {
 	if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
-		if is_not_empty "${global_installmedia_device_node-}" && is_existing "${global_installmedia_device_node}"; then
-			hdiutil detach "${global_installmedia_device_node}" -force &> /dev/null && unset global_installmedia_device_node
+		if is_not_empty "${global_install_media_device_node-}" && is_existing "${global_install_media_device_node}"; then
+			hdiutil detach "${global_install_media_device_node}" -force &> /dev/null && unset global_install_media_device_node
 		fi
 
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
@@ -1050,8 +1050,8 @@ main() {
 	# ==================================================================
 
 	local iso_source_image
-	local installmedia_destination_image
-	local installmedia_destination_volname
+	local install_media_destination_image
+	local install_media_destination_volname
 
 	case "${installer_application_type}" in
 
@@ -1067,19 +1067,19 @@ main() {
 		# '3' - Installer application type for Mac OS X 10.12 to 10.13
 		3 )
 			echo "Creating volume for install media..."
-			installmedia_destination_image="${global_tmp_directory}/InstallMedia.sparseimage"
-			installmedia_destination_volname="InstallMedia.${random_string}"
-			hdiutil create "${installmedia_destination_image}" -type SPARSE -fs HFS+J -volname "${installmedia_destination_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
-			global_installmedia_device_node="$(hdiutil attach "${installmedia_destination_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
+			install_media_destination_image="${global_tmp_directory}/InstallMedia.sparseimage"
+			install_media_destination_volname="InstallMedia.${random_string}"
+			hdiutil create "${install_media_destination_image}" -type SPARSE -fs HFS+J -volname "${install_media_destination_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
+			global_install_media_device_node="$(hdiutil attach "${install_media_destination_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
 			echo "Create complete."
 
 			echo "Creating install media..."
-			"${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${installmedia_destination_volname}" --applicationpath "${installer_application_path}" --nointeraction
+			"${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_destination_volname}" --applicationpath "${installer_application_path}" --nointeraction
 
-			hdiutil detach "${global_installmedia_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
-			unset global_installmedia_device_node
+			hdiutil detach "${global_install_media_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+			unset global_install_media_device_node
 
-			iso_source_image="${installmedia_destination_image}"
+			iso_source_image="${install_media_destination_image}"
 			;;
 
 	esac
