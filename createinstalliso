@@ -120,14 +120,14 @@ echo_error() {
 
 echo_error_usage() {
 	cat <<-EOF 1>&2
-	Usage: ${const_script_name} --destinationpath <path to destination directory> --applicationpath <path to OS installer application> [--nointeraction]
+	Usage: ${const_script_name} --outputdirectory <path to output directory> --applicationpath <path to OS installer application> [--nointeraction]
 
 	Arguments
-	--destinationpath, A path to a directory where the installer ISO image will be created.
+	--outputdirectory, A path to a directory where the installer ISO image will be created.
 	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
-	--nointeraction, Delete an existing destination file without prompting for confirmation.
+	--nointeraction, Delete an existing ISO image without prompting for confirmation.
 
-	Example: ${const_script_name} --destinationpath ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
+	Example: ${const_script_name} --outputdirectory ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
 EOF
 	if ! is_root; then
 		echo_error
@@ -258,12 +258,12 @@ is_short_options_combination() {
 	[[ "${argument}" == -[^-]?* ]]
 }
 
-is_valid_destination_directory_path() {
-	local -r destination_directory_path="$1"
+is_valid_output_directory_path() {
+	local -r output_directory_path="$1"
 
-	is_not_empty "${destination_directory_path}" || return 1
+	is_not_empty "${output_directory_path}" || return 1
 
-	is_directory "${destination_directory_path}"
+	is_directory "${output_directory_path}"
 }
 
 is_valid_installer_application_path() {
@@ -845,7 +845,7 @@ main() {
 	# ==================================================================
 
 	unset option_applicationpath
-	unset option_destinationpath
+	unset option_outputdirectory
 	local option_nointeraction="false"
 
 	local long_option
@@ -896,9 +896,9 @@ main() {
 				option_applicationpath="${option_parameter}"
 				;;
 
-			# Option '--destinationpath'
-			-d* | --d* )
-				long_option="--destinationpath"
+			# Option '--outputdirectory'
+			-o* | --o* )
+				long_option="--outputdirectory"
 
 				if is_option_including_option_parameter "$1"; then
 					if is_long_option "$1"; then
@@ -917,7 +917,7 @@ main() {
 					shift 2
 				fi
 
-				option_destinationpath="${option_parameter}"
+				option_outputdirectory="${option_parameter}"
 				;;
 
 			# Option '--nointeraction'
@@ -967,13 +967,13 @@ main() {
 	# Verify command line options
 	# ==================================================================
 
-	if [[ "${option_applicationpath+set}" != "set" || "${option_destinationpath+set}" != "set" ]]; then
-		echo_error "You must specify both the destination directory and install application path."
+	if [[ "${option_applicationpath+set}" != "set" || "${option_outputdirectory+set}" != "set" ]]; then
+		echo_error "You must specify both the output directory and install application path."
 		exit 255
 	fi
 
-	if ! is_valid_destination_directory_path "${option_destinationpath}"; then
-		echo_error "${option_destinationpath} is not a valid destination directory."
+	if ! is_valid_output_directory_path "${option_outputdirectory}"; then
+		echo_error "${option_outputdirectory} is not a valid output directory."
 		exit 254
 	fi
 
@@ -987,18 +987,18 @@ main() {
 	# ==================================================================
 
 	local installer_application_path
-	local destination_directory_path
+	local output_directory_path
 	local installer_application_display_name
 	local -i installer_application_type
 	local iso_destination_image
 	local random_string
 
 	installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
-	destination_directory_path="$(get_absolute_logical_path "${option_destinationpath}")" || exit_with_error "Couldn't get absolute path for ${option_destinationpath}."
+	output_directory_path="$(get_absolute_logical_path "${option_outputdirectory}")" || exit_with_error "Couldn't get absolute path for ${option_outputdirectory}."
 
 	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_error "Couldn't get installer application display name."
 	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_error "Couldn't get installer application type."
-	iso_destination_image="${destination_directory_path}/${installer_application_display_name}.iso"
+	iso_destination_image="${output_directory_path}/${installer_application_display_name}.iso"
 
 	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
 	random_string="${global_tmp_directory##*.}"
