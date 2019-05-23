@@ -63,7 +63,7 @@ declare -r -a const_supported_installer_application_display_names=(
 unset global_exit_message
 unset global_tmp_directory
 unset global_install_media_device_node
-unset global_incomplete_iso_destination_image
+unset global_incomplete_iso_target_image
 declare -i global_exit_with_error_exit_status="1"
 
 # ======================================================================
@@ -99,9 +99,8 @@ cleanup() {
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
 	fi
 
-	# Remove an incomplete destination image from the target directory.
-	if is_not_empty "${global_incomplete_iso_destination_image-}" && is_existing "${global_incomplete_iso_destination_image}"; then
-		rm -rf "${global_incomplete_iso_destination_image}" &> /dev/null && unset global_incomplete_iso_destination_image
+	if is_not_empty "${global_incomplete_iso_target_image-}" && is_existing "${global_incomplete_iso_target_image}"; then
+		rm -rf "${global_incomplete_iso_target_image}" &> /dev/null && unset global_incomplete_iso_target_image
 	fi
 
 	return 0
@@ -702,15 +701,15 @@ get_installer_application_type()
 
 create_iso_image() {
 	local -r source_image="$1"
-	local -r destination_image="$2"
+	local -r target_image="$2"
 	local -i exit_status
 
 	is_not_empty "${source_image}" || return 1
-	is_not_empty "${destination_image}" || return 1
+	is_not_empty "${target_image}" || return 1
 
 	is_existing "${source_image}" || return 1
 
-	hdiutil convert "${source_image}" -format UDTO -o "${destination_image}" -puppetstrings 2> /dev/null > >(parse_create_iso_image)
+	hdiutil convert "${source_image}" -format UDTO -o "${target_image}" -puppetstrings 2> /dev/null > >(parse_create_iso_image)
 	exit_status="$?"
 
 	if [[ "${exit_status}" == "0" ]]; then
@@ -1030,7 +1029,7 @@ main() {
 	local target_directory_path
 	local installer_application_display_name
 	local -i installer_application_type
-	local iso_destination_image
+	local iso_target_image
 	local random_string
 
 	installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
@@ -1038,7 +1037,7 @@ main() {
 
 	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_error "Couldn't get installer application display name."
 	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_error "Couldn't get installer application type."
-	iso_destination_image="${target_directory_path}/${installer_application_display_name}.iso"
+	iso_target_image="${target_directory_path}/${installer_application_display_name}.iso"
 
 	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
 	random_string="${global_tmp_directory##*.}"
@@ -1055,24 +1054,24 @@ main() {
 	# Perform required user interactions
 	# ==================================================================
 
-	local type_of_existing_destination
+	local type_of_existing_target
 
-	if is_existing "${iso_destination_image}"; then
-		if is_file "${iso_destination_image}"; then
-			type_of_existing_destination="file"
+	if is_existing "${iso_target_image}"; then
+		if is_file "${iso_target_image}"; then
+			type_of_existing_target="file"
 		else
-			type_of_existing_destination="directory"
+			type_of_existing_target="directory"
 		fi
 		if [[ ! "${option_nointeraction}" == "true" ]]; then
 			echo "Ready to start."
-			echo "To continue we need to delete the ${type_of_existing_destination} ${iso_destination_image}."
+			echo "To continue we need to delete the ${type_of_existing_target} ${iso_target_image}."
 			if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
 				echo "Operation canceled."
 				exit 0
 			fi
 		fi
 
-		rm -rf "${iso_destination_image}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_destination} ${iso_destination_image}."
+		rm -rf "${iso_target_image}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
 	fi
 
 	# Once the script has reached this point of execution, it will
@@ -1090,8 +1089,8 @@ main() {
 	# ==================================================================
 
 	local iso_source_image
-	local install_media_destination_image
-	local install_media_destination_volname
+	local install_media_target_image
+	local install_media_target_volname
 
 	case "${installer_application_type}" in
 
@@ -1107,19 +1106,19 @@ main() {
 		# '3' - Installer application type for Mac OS X 10.12 to 10.13
 		3 )
 			echo "Creating volume for install media..."
-			install_media_destination_image="${global_tmp_directory}/InstallMedia.sparseimage"
-			install_media_destination_volname="InstallMedia.${random_string}"
-			hdiutil create "${install_media_destination_image}" -type SPARSE -fs HFS+J -volname "${install_media_destination_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
-			global_install_media_device_node="$(hdiutil attach "${install_media_destination_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
+			install_media_target_image="${global_tmp_directory}/InstallMedia.sparseimage"
+			install_media_target_volname="InstallMedia.${random_string}"
+			hdiutil create "${install_media_target_image}" -type SPARSE -fs HFS+J -volname "${install_media_target_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
+			global_install_media_device_node="$(hdiutil attach "${install_media_target_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
 			echo "Create complete."
 
 			echo "Creating install media..."
-			"${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_destination_volname}" --applicationpath "${installer_application_path}" --nointeraction
+			"${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction
 
 			hdiutil detach "${global_install_media_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
 			unset global_install_media_device_node
 
-			iso_source_image="${install_media_destination_image}"
+			iso_source_image="${install_media_target_image}"
 			;;
 
 	esac
@@ -1131,9 +1130,9 @@ main() {
 	create_iso_image "${iso_source_image}" "${global_tmp_directory}/InstallerDiskImage.cdr" || exit_with_error "Failed to create ISO image."
 
 	echo "Copying to target directory..."
-	global_incomplete_iso_destination_image="${iso_destination_image}"
-	mv -f "${global_tmp_directory}/InstallerDiskImage.cdr" "${iso_destination_image}" &> /dev/null || exit_with_error "Failed to copy ISO image."
-	unset global_incomplete_iso_destination_image
+	global_incomplete_iso_target_image="${iso_target_image}"
+	mv -f "${global_tmp_directory}/InstallerDiskImage.cdr" "${iso_target_image}" &> /dev/null || exit_with_error "Failed to copy ISO image."
+	unset global_incomplete_iso_target_image
 
 	exit 0
 }
