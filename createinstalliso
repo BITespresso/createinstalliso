@@ -700,16 +700,16 @@ get_installer_application_type()
 }
 
 create_iso_image() {
-	local -r source_image="$1"
-	local -r target_image="$2"
+	local -r iso_source_image="$1"
+	local -r iso_target_image="$2"
 	local -i exit_status
 
-	is_not_empty "${source_image}" || return 1
-	is_not_empty "${target_image}" || return 1
+	is_not_empty "${iso_source_image}" || return 1
+	is_not_empty "${iso_target_image}" || return 1
 
-	is_existing "${source_image}" || return 1
+	is_existing "${iso_source_image}" || return 1
 
-	hdiutil convert "${source_image}" -format UDTO -o "${target_image}" -puppetstrings 2> /dev/null > >(parse_create_iso_image)
+	hdiutil convert "${iso_source_image}" -format UDTO -o "${iso_target_image}" -puppetstrings 2> /dev/null > >(parse_create_iso_image)
 	exit_status="$?"
 
 	if [[ "${exit_status}" == "0" ]]; then
