@@ -99,11 +99,11 @@ cleanup() {
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
 	fi
 
-	# Remove the incomplete destination image if the user interrupts the
-	# script while creating the final ISO image.
+	# Remove an incomplete destination image from the output directory.
 	if is_not_empty "${global_incomplete_iso_destination_image-}" && is_existing "${global_incomplete_iso_destination_image}"; then
 		rm -rf "${global_incomplete_iso_destination_image}" &> /dev/null && unset global_incomplete_iso_destination_image
 	fi
+
 	return 0
 }
 
@@ -703,15 +703,55 @@ get_installer_application_type()
 create_iso_image() {
 	local -r source_image="$1"
 	local -r destination_image="$2"
-	local -r default_volume_name="$3"
+	local -i exit_status
 
 	is_not_empty "${source_image}" || return 1
 	is_not_empty "${destination_image}" || return 1
-	is_not_empty "${default_volume_name}" || return 1
 
 	is_existing "${source_image}" || return 1
 
-	hdiutil makehybrid -o "${destination_image}" "${source_image}" -hfs -udf -default-volume-name "${default_volume_name}" &> /dev/null
+	hdiutil convert "${source_image}" -format UDTO -o "${destination_image}" -puppetstrings 2> /dev/null > >(parse_create_iso_image)
+	exit_status="$?"
+
+	if [[ "${exit_status}" == "0" ]]; then
+		echo " 100%"
+	else
+		echo
+	fi
+
+	return "${exit_status}"
+}
+
+parse_create_iso_image() {
+	local line
+	local first_percent_line="true"
+	local -r percent_line_regex='^PERCENT:[[:digit:]]+\.[[:digit:]]+$'
+	local percent_float
+	local -i percent_int
+	local -i percent_int_step
+	local -i -a percent_int_steps=(20 40 60 80)
+	local -i last_percent_int=0
+
+
+	while IFS= read -r line; do
+		if [[ "${line}" =~ ${percent_line_regex} ]]; then
+			if [[ "${first_percent_line}" == "true" ]]; then
+				echo -n "Creating ISO image: 0%..."
+				first_percent_line="false"
+			fi
+
+			percent_float="${line#PERCENT:}"
+			percent_int="${percent_float%.*}"
+
+			for percent_int_step in "${percent_int_steps[@]}"; do
+				if (( (last_percent_int < percent_int_step) && (percent_int >= percent_int_step) )) ; then
+					echo -n " ${percent_int_step}%..."
+				fi
+			done
+
+			(( last_percent_int = percent_int ))
+		fi
+	done
 }
 
 # ----------------------------------------------------------------------
@@ -1088,11 +1128,12 @@ main() {
 	# Create ISO image
 	# ==================================================================
 
-	echo "Creating ISO image..."
+	create_iso_image "${iso_source_image}" "${global_tmp_directory}/InstallerDiskImage.cdr" || exit_with_error "Failed to create ISO image."
+
+	echo "Copying to output directory..."
 	global_incomplete_iso_destination_image="${iso_destination_image}"
-	create_iso_image "${iso_source_image}" "${iso_destination_image}" "${installer_application_display_name}" || exit_with_error "Failed to create ISO image."
+	mv -f "${global_tmp_directory}/InstallerDiskImage.cdr" "${iso_destination_image}" &> /dev/null || exit_with_error "Failed to copy ISO image."
 	unset global_incomplete_iso_destination_image
-	echo "Create complete."
 
 	exit 0
 }
