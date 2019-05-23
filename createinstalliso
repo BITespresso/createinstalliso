@@ -99,7 +99,7 @@ cleanup() {
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
 	fi
 
-	# Remove an incomplete destination image from the output directory.
+	# Remove an incomplete destination image from the target directory.
 	if is_not_empty "${global_incomplete_iso_destination_image-}" && is_existing "${global_incomplete_iso_destination_image}"; then
 		rm -rf "${global_incomplete_iso_destination_image}" &> /dev/null && unset global_incomplete_iso_destination_image
 	fi
@@ -120,14 +120,14 @@ echo_error() {
 
 echo_error_usage() {
 	cat <<-EOF 1>&2
-	Usage: ${const_script_name} --outputdirectory <path to output directory> --applicationpath <path to OS installer application> [--nointeraction]
+	Usage: ${const_script_name} --targetdirectory <path to target directory> --applicationpath <path to OS installer application> [--nointeraction]
 
 	Arguments
-	--outputdirectory, A path to a directory where the installer ISO image will be created.
+	--targetdirectory, A path to a directory where the installer ISO image will be created.
 	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
 	--nointeraction, Delete an existing ISO image without prompting for confirmation.
 
-	Example: ${const_script_name} --outputdirectory ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
+	Example: ${const_script_name} --targetdirectory ~/Desktop --applicationpath "/Applications/$(get_example_installer_application_name)"
 EOF
 	if ! is_root; then
 		echo_error
@@ -258,12 +258,12 @@ is_short_options_combination() {
 	[[ "${argument}" == -[^-]?* ]]
 }
 
-is_valid_output_directory_path() {
-	local -r output_directory_path="$1"
+is_valid_target_directory_path() {
+	local -r target_directory_path="$1"
 
-	is_not_empty "${output_directory_path}" || return 1
+	is_not_empty "${target_directory_path}" || return 1
 
-	is_directory "${output_directory_path}"
+	is_directory "${target_directory_path}"
 }
 
 is_valid_installer_application_path() {
@@ -885,7 +885,7 @@ main() {
 	# ==================================================================
 
 	unset option_applicationpath
-	unset option_outputdirectory
+	unset option_targetdirectory
 	local option_nointeraction="false"
 
 	local long_option
@@ -936,9 +936,9 @@ main() {
 				option_applicationpath="${option_parameter}"
 				;;
 
-			# Option '--outputdirectory'
-			-o* | --o* )
-				long_option="--outputdirectory"
+			# Option '--targetdirectory'
+			-t* | --t* )
+				long_option="--targetdirectory"
 
 				if is_option_including_option_parameter "$1"; then
 					if is_long_option "$1"; then
@@ -957,7 +957,7 @@ main() {
 					shift 2
 				fi
 
-				option_outputdirectory="${option_parameter}"
+				option_targetdirectory="${option_parameter}"
 				;;
 
 			# Option '--nointeraction'
@@ -1007,13 +1007,13 @@ main() {
 	# Verify command line options
 	# ==================================================================
 
-	if [[ "${option_applicationpath+set}" != "set" || "${option_outputdirectory+set}" != "set" ]]; then
-		echo_error "You must specify both the output directory and install application path."
+	if [[ "${option_applicationpath+set}" != "set" || "${option_targetdirectory+set}" != "set" ]]; then
+		echo_error "You must specify both the target directory and install application path."
 		exit 255
 	fi
 
-	if ! is_valid_output_directory_path "${option_outputdirectory}"; then
-		echo_error "${option_outputdirectory} is not a valid output directory."
+	if ! is_valid_target_directory_path "${option_targetdirectory}"; then
+		echo_error "${option_targetdirectory} is not a valid target directory."
 		exit 254
 	fi
 
@@ -1027,18 +1027,18 @@ main() {
 	# ==================================================================
 
 	local installer_application_path
-	local output_directory_path
+	local target_directory_path
 	local installer_application_display_name
 	local -i installer_application_type
 	local iso_destination_image
 	local random_string
 
 	installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
-	output_directory_path="$(get_absolute_logical_path "${option_outputdirectory}")" || exit_with_error "Couldn't get absolute path for ${option_outputdirectory}."
+	target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_error "Couldn't get absolute path for ${option_targetdirectory}."
 
 	installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_error "Couldn't get installer application display name."
 	installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_error "Couldn't get installer application type."
-	iso_destination_image="${output_directory_path}/${installer_application_display_name}.iso"
+	iso_destination_image="${target_directory_path}/${installer_application_display_name}.iso"
 
 	global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
 	random_string="${global_tmp_directory##*.}"
@@ -1130,7 +1130,7 @@ main() {
 
 	create_iso_image "${iso_source_image}" "${global_tmp_directory}/InstallerDiskImage.cdr" || exit_with_error "Failed to create ISO image."
 
-	echo "Copying to output directory..."
+	echo "Copying to target directory..."
 	global_incomplete_iso_destination_image="${iso_destination_image}"
 	mv -f "${global_tmp_directory}/InstallerDiskImage.cdr" "${iso_destination_image}" &> /dev/null || exit_with_error "Failed to copy ISO image."
 	unset global_incomplete_iso_destination_image
