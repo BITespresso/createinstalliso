@@ -723,32 +723,29 @@ create_iso_image() {
 
 parse_create_iso_image() {
 	local line
+	local -r percent_line_regex='^PERCENT:([[:digit:]]+)\.*[[:digit:]]*$'
+	local -i percent
 	local first_percent_line="true"
-	local -r percent_line_regex='^PERCENT:[[:digit:]]+\.[[:digit:]]+$'
-	local percent_float
-	local -i percent_int
-	local -i percent_int_step
-	local -i -a percent_int_steps=(20 40 60 80)
-	local -i last_percent_int=0
-
+	local -i percent_step
+	local -i -a percent_steps=(20 40 60 80)
+	local -i last_percent=0
 
 	while IFS= read -r line; do
 		if [[ "${line}" =~ ${percent_line_regex} ]]; then
+			percent="${BASH_REMATCH[1]}"
+
 			if [[ "${first_percent_line}" == "true" ]]; then
 				echo -n "Creating ISO image: 0%..."
 				first_percent_line="false"
 			fi
 
-			percent_float="${line#PERCENT:}"
-			percent_int="${percent_float%.*}"
-
-			for percent_int_step in "${percent_int_steps[@]}"; do
-				if (( (last_percent_int < percent_int_step) && (percent_int >= percent_int_step) )) ; then
-					echo -n " ${percent_int_step}%..."
+			for percent_step in "${percent_steps[@]}"; do
+				if (( (last_percent < percent_step) && (percent >= percent_step) )) ; then
+					echo -n " ${percent_step}%..."
 				fi
 			done
 
-			(( last_percent_int = percent_int ))
+			(( last_percent = percent ))
 		fi
 	done
 }
