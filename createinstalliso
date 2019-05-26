@@ -727,7 +727,7 @@ parse_create_iso_image() {
 	local -i percent
 	local first_percent_line="true"
 	local -i percent_step
-	local -i -a percent_steps=("20" "40" "60" "80")
+	local -i -r -a percent_steps=("20" "40" "60" "80")
 	local -i last_percent=0
 
 	while IFS= read -r line; do
