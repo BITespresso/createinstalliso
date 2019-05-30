@@ -424,6 +424,12 @@ is_array_item() {
 	return 1
 }
 
+has_applicationpath_option() {
+    local -r installer_application_path="$1"
+
+	"${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" &> /dev/null
+}
+
 # ----------------------------------------------------------------------
 # Executes a PlistBuddy command on a property list file.
 #
@@ -704,8 +710,13 @@ create_install_media() {
     local -r install_media_target_volname="$2"
     local -i exit_status
 
-    script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media)
-	exit_status="$?"
+    if has_applicationpath_option "${installer_application_path}"; then
+		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media)
+		exit_status="$?"
+    else
+		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media)
+		exit_status="$?"
+	fi
 
 	if [[ "${exit_status}" == "2" ]]; then
 		signal_handler
