@@ -787,7 +787,7 @@ parse_create_iso_image() {
 			fi
 
 			for percent_step in "${percent_steps[@]}"; do
-				if (( (last_percent < percent_step) && (percent >= percent_step) )) ; then
+				if (( (last_percent < percent_step) && (percent >= percent_step) )); then
 					echo -n " ${percent_step}%..."
 				fi
 			done
