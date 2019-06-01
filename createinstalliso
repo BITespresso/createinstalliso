@@ -30,24 +30,24 @@ declare -r -i const_root_uid="0"
 # or later. However on Mac OS X 10.5 Leopard PlistBuddy does not handle
 # large integer values correctly. Therefore, this script requires
 # Mac OS X 10.6 Snow Leopard or later.
-declare -r -a const_unsupported_mac_os_x_major_versions=(
-	"10.0"  # Mac OS X Cheetah
-	"10.1"  # Mac OS X Puma
-	"10.2"  # Mac OS X Jaguar
-	"10.3"  # Mac OS X Panther
-	"10.4"  # Mac OS X Tiger
-	"10.5"  # Mac OS X Leopard
+declare -r -a const_unsupported_macos_minor_versions=(
+	"0"  # Mac OS X Cheetah      10.0
+	"1"  # Mac OS X Puma         10.1
+	"2"  # Mac OS X Jaguar       10.2
+	"3"  # Mac OS X Panther      10.3
+	"4"  # Mac OS X Tiger        10.4
+	"5"  # Mac OS X Leopard      10.5
 )
 
 # This script has been tested on the following macOS versions.
-declare -r -a const_supported_mac_os_x_major_versions=(
-	"10.6"  # Mac OS X Snow Leopard
-	"10.7"  # Mac OS X Lion
-	"10.8"  # OS X Mountain Lion
-	"10.9"  # OS X Mavericks
-	"10.10" # OS X Yosemite
-	"10.11" # OS X El Capitan
-	"10.12" # macOS Sierra
+declare -r -a const_supported_macos_minor_versions=(
+	"6"  # Mac OS X Snow Leopard 10.6
+	"7"  # Mac OS X Lion         10.7
+	"8"  # OS X Mountain Lion    10.8
+	"9"  # OS X Mavericks        10.9
+	"10" # OS X Yosemite         10.10
+	"11" # OS X El Capitan       10.11
+	"12" # macOS Sierra          10.12
 )
 
 # This script has been tested with the following installer applications.
@@ -367,7 +367,7 @@ is_valid_installer_application_path() {
 # Output:
 # none - returns with exit status zero if true
 # ----------------------------------------------------------------------
-is_mac_os_x() {
+is_macos() {
 	local -r os_name="$1"
 
 	is_not_empty "${os_name}" || return 1
@@ -375,23 +375,23 @@ is_mac_os_x() {
 	[[ "${os_name}" == "Darwin" ]]
 }
 
-is_valid_mac_os_x_version() {
-	local -r mac_os_x_version="$1"
-	local -r valid_mac_os_x_version_regex='^10\.[[:digit:]]+(\.[[:digit:]]+)?$'
+is_valid_macos_version() {
+	local -r macos_version="$1"
+	local -r valid_macos_version_regex='^10\.[[:digit:]]+(\.[[:digit:]]+)?$'
 
-	[[ "${mac_os_x_version}" =~ ${valid_mac_os_x_version_regex} ]]
+	[[ "${macos_version}" =~ ${valid_macos_version_regex} ]]
 }
 
-is_unsupported_mac_os_x_major_version() {
-	local -r mac_os_x_major_version="$1"
+is_unsupported_macos_minor_version() {
+	local -r macos_minor_version="$1"
 
-	is_array_item "${mac_os_x_major_version}" "const_unsupported_mac_os_x_major_versions"
+	is_array_item "${macos_minor_version}" "const_unsupported_macos_minor_versions"
 }
 
-is_supported_mac_os_x_major_version() {
-	local -r mac_os_x_major_version="$1"
+is_supported_macos_minor_version() {
+	local -r macos_minor_version="$1"
 
-	is_array_item "${mac_os_x_major_version}" "const_supported_mac_os_x_major_versions"
+	is_array_item "${macos_minor_version}" "const_supported_macos_minor_versions"
 }
 
 is_supported_installer_application_display_name() {
@@ -462,52 +462,6 @@ get_os_name() {
 	os_name="$(uname -s 2> /dev/null)" || return 1
 
 	echo "${os_name}"
-	return 0
-}
-
-# ----------------------------------------------------------------------
-# Returns the major version of the running macOS operating system.
-#
-# Output:
-# macOS major version
-# ----------------------------------------------------------------------
-get_mac_os_x_major_version() {
-	local mac_os_x_version
-	local mac_os_x_major_version
-
-	mac_os_x_version="$(sw_vers -productVersion 2> /dev/null)" || return 1
-	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
-
-	mac_os_x_major_version="$(get_mac_os_x_major_version_from_mac_os_x_version "${mac_os_x_version}")" || return 1
-
-	echo "${mac_os_x_major_version}"
-	return 0
-}
-
-# ----------------------------------------------------------------------
-# Returns the major version part of a macOS version number. Example:
-# The major version part of the version number '10.12.6' is '10.12'.
-#
-# Input:
-# $1 - macOS version number
-#
-# Output:
-# major version part of the macOS version number
-# ----------------------------------------------------------------------
-get_mac_os_x_major_version_from_mac_os_x_version() {
-	local -r mac_os_x_version="$1"
-	local mac_os_x_major_version
-	local -r valid_mac_os_x_major_version_regex='^10\.[[:digit:]]+$'
-
-	is_valid_mac_os_x_version "${mac_os_x_version}" || return 1
-
-	if [[ "${mac_os_x_version}" =~ ${valid_mac_os_x_major_version_regex} ]]; then
-		mac_os_x_major_version="${mac_os_x_version}"
-	else
-		mac_os_x_major_version="${mac_os_x_version%.*}"
-	fi
-
-	echo "${mac_os_x_major_version}"
 	return 0
 }
 
@@ -949,24 +903,30 @@ main() {
 	# ==================================================================
 
 	local os_name
-	local mac_os_x_major_version
+	local -i -a macos_version
+	local -i macos_major_version
+	local -i macos_minor_version
+	local -i macos_patch_version
 
 	os_name="$(get_os_name)" || exit_with_error "Couldn't get operating system name."
 
-	if ! is_mac_os_x "${os_name}"; then
+	if ! is_macos "${os_name}"; then
 		echo_error "This tool must be run on macOS."
 		exit 1
 	fi
 
-	mac_os_x_major_version="$(get_mac_os_x_major_version)" || exit_with_error "Couldn't get macOS version."
+	IFS='.' read -r -a macos_version < <(sw_vers -productVersion 2> /dev/null) || exit_with_error "Couldn't get macOS version."
+	macos_major_version="${macos_version[0]:-"0"}"
+	macos_minor_version="${macos_version[1]:-"0"}"
+	macos_patch_version="${macos_version[2]:-"0"}"
 
-	if is_unsupported_mac_os_x_major_version "${mac_os_x_major_version}"; then
-		echo_error "This tool requires macOS ${const_supported_mac_os_x_major_versions[0]} or later."
+	if is_unsupported_macos_minor_version "${macos_minor_version}"; then
+		echo_error "This tool requires macOS 10.${const_supported_macos_minor_versions[0]} or later."
 		exit 1
 	fi
 
-	if ! is_supported_mac_os_x_major_version "${mac_os_x_major_version}"; then
-		echo_warning "This tool has not been tested on macOS ${mac_os_x_major_version}."
+	if ! is_supported_macos_minor_version "${macos_minor_version}"; then
+		echo_warning "This tool has not been tested on macOS ${macos_major_version}.${macos_minor_version}.${macos_patch_version}"
 	fi
 
 	# ==================================================================
