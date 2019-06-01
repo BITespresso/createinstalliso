@@ -903,6 +903,7 @@ main() {
 	# ==================================================================
 
 	local os_name
+	local macos_version_string
 	local -i -a macos_version
 	local -i macos_major_version
 	local -i macos_minor_version
@@ -915,7 +916,8 @@ main() {
 		exit 1
 	fi
 
-	IFS='.' read -r -a macos_version < <(sw_vers -productVersion 2> /dev/null) || exit_with_error "Couldn't get macOS version."
+	macos_version_string="$(sw_vers -productVersion 2> /dev/null)" || exit_with_error "Couldn't get macOS version."
+	IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_error "Couldn't get macOS version."
 	macos_major_version="${macos_version[0]:-"0"}"
 	macos_minor_version="${macos_version[1]:-"0"}"
 	macos_patch_version="${macos_version[2]:-"0"}"
