@@ -276,6 +276,9 @@ is_valid_installer_application_path() {
 	local installer_application_identifier
 	local valid_installer_application_identifier_regex='^com\.apple\.InstallAssistant\.[a-zA-Z0-9.-]+$'
 
+	local installer_minimum_macos_version_string
+	local valid_installer_minimum_macos_version_string_regex='^[[:digit:]]+\.[[:digit:]]+\.?[[:digit:]]*$'
+
 	local system_image_url
 
 	is_not_empty "${installer_application_path}" || return 1
@@ -330,6 +333,17 @@ is_valid_installer_application_path() {
 			# Apple's command 'createinstallmedia' is required because
 			# it will be used to create the installer disk image.
 			is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
+
+			# This file is required because it contains the value for
+			# 'LSMinimumSystemVersion', which determines the minimum
+			# required macOS version for the installer application. The
+			# value itself must be a valid macOS version number.
+			if is_file "${installer_application_path}/Contents/Info.plist"; then
+				installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" || return 1
+				[[ "${installer_minimum_macos_version_string}" =~ ${valid_installer_minimum_macos_version_string_regex} ]] || return 1
+			else
+				return 1
+			fi
 
 			# All subsequent checks are the same as those performed by
 			# Apple's command 'createinstallmedia' to determine if the
@@ -659,6 +673,14 @@ get_installer_application_type()
 	return 0
 }
 
+get_installer_minimum_macos_version() {
+	local -r installer_application_path="$1"
+
+	is_not_empty "${installer_application_path}" || return 1
+
+	get_plist_value ":LSMinimumSystemVersion" "${installer_application_path}/Contents/Info.plist"
+}
+
 create_install_media() {
     local -r installer_application_path="$1"
     local -r install_media_target_volname="$2"
@@ -903,11 +925,13 @@ main() {
 	# ==================================================================
 
 	local os_name
+
 	local macos_version_string
 	local -i -a macos_version
 	local -i macos_major_version
 	local -i macos_minor_version
 	local -i macos_patch_version
+	local -i macos_version_for_compare
 
 	os_name="$(get_os_name)" || exit_with_error "Couldn't get operating system name."
 
@@ -921,6 +945,7 @@ main() {
 	macos_major_version="${macos_version[0]:-"0"}"
 	macos_minor_version="${macos_version[1]:-"0"}"
 	macos_patch_version="${macos_version[2]:-"0"}"
+	(( macos_version_for_compare = (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))
 
 	if is_unsupported_macos_minor_version "${macos_minor_version}"; then
 		echo_error "This tool requires macOS 10.${const_supported_macos_minor_versions[0]} or later."
@@ -1098,8 +1123,29 @@ main() {
 	# Check installer application requirements
 	# ==================================================================
 
+	local installer_minimum_macos_version_string
+	local -i -a installer_minimum_macos_version
+	local -i installer_minimum_macos_major_version
+	local -i installer_minimum_macos_minor_version
+	local -i installer_minimum_macos_patch_version
+	local -i installer_minimum_macos_version_for_compare
+
 	if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
 		echo_warning "${installer_application_display_name} is not a supported installer."
+	fi
+
+	if [[ "${installer_application_type}" == "3" ]]; then
+		installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" || exit_with_error "Couldn't get minimum macOS version for installer application."
+		IFS='.' read -r -a macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_error "Couldn't get minimum macOS version for installer application."
+		installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-"0"}"
+		installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-"0"}"
+		installer_minimum_macos_patch_version="${installer_minimum_macos_version[2]:-"0"}"
+		(( installer_minimum_macos_version_for_compare = (installer_minimum_macos_major_version * 10000) + (installer_minimum_macos_minor_version * 100) + installer_minimum_macos_patch_version ))
+
+		if (( installer_minimum_macos_version_for_compare < macos_version_for_compare )); then
+			echo_error "Creating an ISO image from this installer application requires macOS ${installer_minimum_macos_version_string} or later."
+			exit 1
+		fi
 	fi
 
 	# ==================================================================
