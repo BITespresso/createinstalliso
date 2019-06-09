@@ -748,6 +748,9 @@ create_install_media() {
     local -r install_media_target_volname="$2"
     local -i exit_status
 
+	is_not_empty "${installer_application_path}" || return 1
+	is_not_empty "${install_media_target_volname}" || return 1
+
     if has_applicationpath_option "${installer_application_path}"; then
 		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media)
 		exit_status="$?"
