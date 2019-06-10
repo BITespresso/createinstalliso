@@ -466,7 +466,7 @@ is_array_item() {
 }
 
 has_applicationpath_option() {
-    local -r installer_application_path="$1"
+	local -r installer_application_path="$1"
 
 	"${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" &> /dev/null
 }
@@ -744,17 +744,17 @@ get_installer_minimum_macos_version() {
 }
 
 create_install_media() {
-    local -r installer_application_path="$1"
-    local -r install_media_target_volname="$2"
-    local -i exit_status
+	local -r installer_application_path="$1"
+	local -r install_media_target_volname="$2"
+	local -i exit_status
 
 	is_not_empty "${installer_application_path}" || return 1
 	is_not_empty "${install_media_target_volname}" || return 1
 
-    if has_applicationpath_option "${installer_application_path}"; then
+	if has_applicationpath_option "${installer_application_path}"; then
 		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media)
 		exit_status="$?"
-    else
+	else
 		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media)
 		exit_status="$?"
 	fi
@@ -767,18 +767,18 @@ create_install_media() {
 }
 
 parse_create_install_media() {
-    local char
-    local line_buffer=""
-    local line_blacklisted="false"
-    local line_blacklist_item
-    local -r -a line_blacklist=(
-    	'Erasing Disk: 0%...'
-    	'Erasing disk: 0%...'
-    	'Done.'
-    	'Install media now available at '
+	local char
+	local line_buffer=""
+	local line_blacklisted="false"
+	local line_blacklist_item
+	local -r -a line_blacklist=(
+		'Erasing Disk: 0%...'
+		'Erasing disk: 0%...'
+		'Done.'
+		'Install media now available at '
 	)
-    local text_buffer=""
-    local text_blacklisted="false"
+	local text_buffer=""
+	local text_blacklisted="false"
 	local text_blacklist_item
 	local -r -a text_blacklist=(
 		' 10%...'
@@ -788,49 +788,49 @@ parse_create_install_media() {
 		' 90%...'
 	)
 
-    while IFS= read -r -n1 -d "" char; do
-    	line_buffer="${line_buffer}${char}"
-    	text_buffer="${text_buffer}${char}"
+	while IFS= read -r -n1 -d "" char; do
+		line_buffer="${line_buffer}${char}"
+		text_buffer="${text_buffer}${char}"
 
-    	if [[ "${char}" == $'\n' ]]; then
-    		if [[ ! "${line_blacklisted}" == "true" ]]; then
-    			echo -n "${text_buffer}"
-    		fi
+		if [[ "${char}" == $'\n' ]]; then
+			if [[ ! "${line_blacklisted}" == "true" ]]; then
+				echo -n "${text_buffer}"
+			fi
 
 			line_buffer=""
 			text_buffer=""
-    	else
-    		line_blacklisted="false"
-    		for line_blacklist_item in "${line_blacklist[@]}"; do
-    			if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
-    				line_blacklisted="maybe"
-    			fi
-
-    			if [[ "${line_buffer}" =~ ^"${line_blacklist_item}".* ]]; then
-    				line_blacklisted="true"
-    			fi
-    		done
-
-    		if [[ "${line_blacklisted}" == "false" ]]; then
-	    		text_blacklisted="false"
-	    		for text_blacklist_item in "${text_blacklist[@]}"; do
-	    			if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
-	    				text_blacklisted="maybe"
-	    			fi
-
-	    			if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
-	    				text_blacklisted="true"
-	    				text_buffer=""
-	    			fi
-	    		done
-
-	    		if [[ "${text_blacklisted}" == "false" ]]; then
-	    			echo -n "${text_buffer}"
-	    			text_buffer=""
+		else
+			line_blacklisted="false"
+			for line_blacklist_item in "${line_blacklist[@]}"; do
+				if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
+					line_blacklisted="maybe"
 				fi
-    		fi
+
+				if [[ "${line_buffer}" =~ ^"${line_blacklist_item}".* ]]; then
+					line_blacklisted="true"
+				fi
+			done
+
+			if [[ "${line_blacklisted}" == "false" ]]; then
+				text_blacklisted="false"
+				for text_blacklist_item in "${text_blacklist[@]}"; do
+					if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
+						text_blacklisted="maybe"
+					fi
+
+					if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
+						text_blacklisted="true"
+						text_buffer=""
+					fi
+				done
+
+				if [[ "${text_blacklisted}" == "false" ]]; then
+					echo -n "${text_buffer}"
+					text_buffer=""
+				fi
+			fi
 		fi
-    done
+	done
 }
 
 create_iso_image() {
@@ -1284,11 +1284,11 @@ main() {
 			echo "Creating disk image..."
 			install_media_target_image="${global_tmp_directory}/InstallMedia.sparseimage"
 			install_media_target_volname="InstallMedia.${random_string}"
-            hdiutil create -size 12g "${install_media_target_image}" -type SPARSE -fs HFS+J -volname "${install_media_target_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
-            global_install_media_device_node="$(hdiutil attach "${install_media_target_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
-            echo "Create complete."
+			hdiutil create -size 12g "${install_media_target_image}" -type SPARSE -fs HFS+J -volname "${install_media_target_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
+			global_install_media_device_node="$(hdiutil attach "${install_media_target_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
+			echo "Create complete."
 
-            create_install_media "${installer_application_path}" "${install_media_target_volname}" || exit_with_error "Failed to create install media."
+			create_install_media "${installer_application_path}" "${install_media_target_volname}" || exit_with_error "Failed to create install media."
 
 			hdiutil detach "${global_install_media_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
 			unset global_install_media_device_node
