@@ -801,7 +801,8 @@ parse_create_install_media() {
 			text_buffer=""
 		else
 			line_blacklisted="false"
-			for line_blacklist_item in "${line_blacklist[@]}"; do
+			for line_blacklist_item in "${line_blacklist[@]-}"; do
+				is_not_empty "${line_blacklist_item}" || continue
 				if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
 					line_blacklisted="maybe"
 				fi
@@ -813,7 +814,8 @@ parse_create_install_media() {
 
 			if [[ "${line_blacklisted}" == "false" ]]; then
 				text_blacklisted="false"
-				for text_blacklist_item in "${text_blacklist[@]}"; do
+				for text_blacklist_item in "${text_blacklist[@]-}"; do
+					is_not_empty "${text_blacklist_item}" || continue
 					if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
 						text_blacklisted="maybe"
 					fi
