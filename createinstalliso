@@ -809,6 +809,7 @@ parse_create_install_media() {
 
 				if [[ "${line_buffer}" =~ ^"${line_blacklist_item}".* ]]; then
 					line_blacklisted="true"
+					break
 				fi
 			done
 
@@ -823,6 +824,7 @@ parse_create_install_media() {
 					if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
 						text_blacklisted="true"
 						text_buffer=""
+						break
 					fi
 				done
 
