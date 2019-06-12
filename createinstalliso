@@ -1216,7 +1216,6 @@ main() {
 
 		if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
 			macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_error "Invalid macOS version."
-#			echo_error "Creating an ISO image from this installer application requires ${macos_name_and_version} or later."
 			echo_error "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
 			exit 1
 		fi
