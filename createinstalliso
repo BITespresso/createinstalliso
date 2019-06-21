@@ -759,11 +759,19 @@ create_install_media() {
 		exit_status="$?"
 	fi
 
-	if [[ "${exit_status}" == "2" ]]; then
+	if script_createinstallmedia_was_canceled "${exit_status}"; then
 		signal_handler
 	fi
 
 	return "${exit_status}"
+}
+
+script_createinstallmedia_was_canceled() {
+	local -r exit_status="$1"
+
+	is_not_empty "${exit_status}" || return 1
+
+	[[ "${exit_status}" == "2" ]]
 }
 
 parse_create_install_media() {
