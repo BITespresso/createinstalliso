@@ -840,50 +840,140 @@ parse_create_install_media() {
 create_iso_image() {
 	local -r iso_source_image="$1"
 	local -r iso_target_image="$2"
+	local -r default_volume_name="$3"
+	local -r typescript_file="${global_tmp_directory}/typescript_hdiutil_makehybrid"
 	local -i exit_status
 
 	is_not_empty "${iso_source_image}" || return 1
 	is_not_empty "${iso_target_image}" || return 1
+	is_not_empty "${default_volume_name}" || return 1
 
 	is_existing "${iso_source_image}" || return 1
 
-	hdiutil convert "${iso_source_image}" -format UDTO -o "${iso_target_image}" -puppetstrings 2> /dev/null > >(parse_create_iso_image)
+	script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2> /dev/null > >(parse_create_iso_image)
 	exit_status="$?"
 
-	if [[ "${exit_status}" == "0" ]]; then
-		echo " 100%"
-	else
-		echo
+	if script_hdiutil_makehybrid_was_canceled "${typescript_file}"; then
+		signal_handler
 	fi
 
 	return "${exit_status}"
 }
 
+script_hdiutil_makehybrid_was_canceled() {
+	local -r typescript_file="$1"
+
+	is_not_empty "${typescript_file}" || return 1
+
+	grep --regexp="canceling\.\.\." "${typescript_file}" &> /dev/null
+}
+
 parse_create_iso_image() {
-	local line
-	local -r percent_line_regex='^PERCENT:([[:digit:]]+)\.*[[:digit:]]*$'
+	local char
+	local line_buffer=""
+	local line_blacklisted="false"
+	local line_blacklist_item
+	local -r -a line_blacklist=(
+		'Creating hybrid image...'
+		'hdiutil:'
+	)
+	local text_buffer=""
+	local text_blacklisted="false"
+	local text_blacklist_item
+	local -r -a text_blacklist=(
+		'canceling...'
+	)
+	local is_progress_line="false"
+	local -r shell_columns=$(tput cols)
+	local -r -i dots_count_max=$(( shell_columns - 2 ))
+	local -i dots_count=0
 	local -i percent
-	local first_percent_line="true"
 	local -i percent_step
-	local -i -r -a percent_steps=("20" "40" "60" "80")
+	local -i -r -a percent_steps=("20" "40" "60" "80" "100")
 	local -i last_percent=0
+	local mute="false"
+	local possible_empty_line="true"
 
-	while IFS= read -r line; do
-		if [[ "${line}" =~ ${percent_line_regex} ]]; then
-			percent="${BASH_REMATCH[1]}"
+	while IFS= read -r -n1 -d "" char; do
+		if [[ "${mute}" == "true" ]]; then
+			continue
+		fi
 
-			if [[ "${first_percent_line}" == "true" ]]; then
-				echo -n "Creating ISO image: 0%..."
-				first_percent_line="false"
+		if [[ ("${char}" != $'\r') && ("${char}" != $'\n') ]]; then
+			possible_empty_line="false"
+		fi
+
+		line_buffer="${line_buffer}${char}"
+		text_buffer="${text_buffer}${char}"
+
+		if [[ "${char}" == $'\n' ]]; then
+			if [[ (! "${line_blacklisted}" == "true") && ("${possible_empty_line}" == "false") ]]; then
+				echo -n "${text_buffer}"
+				possible_empty_line="true"
 			fi
+
+			if [[ "${line_buffer}" =~ ^"${line_blacklist[0]}".*  ]]; then
+				echo -n "Creating ISO image: 0%..."
+				is_progress_line="true"
+			fi
+
+			line_buffer=""
+			text_buffer=""
+		elif [[ ("${is_progress_line}" == "true") && ("${char}" == ".") ]]; then
+			(( dots_count++ ))
+			(( percent = (100 * dots_count) / dots_count_max ))
 
 			for percent_step in "${percent_steps[@]}"; do
 				if (( (last_percent < percent_step) && (percent >= percent_step) )); then
-					echo -n " ${percent_step}%..."
+					echo -n " ${percent_step}%"
+					if [[ "${percent_step}" != "100" ]]; then
+						echo -n "..."
+					fi
 				fi
 			done
 
 			(( last_percent = percent ))
+
+			line_buffer=""
+			text_buffer=""
+		else
+			is_progress_line="false"
+			line_blacklisted="false"
+			for line_blacklist_item in "${line_blacklist[@]-}"; do
+				is_not_empty "${line_blacklist_item}" || continue
+				if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
+					line_blacklisted="maybe"
+				fi
+
+				if [[ "${line_buffer}" =~ ^"${line_blacklist_item}".* ]]; then
+					line_blacklisted="true"
+					break
+				fi
+			done
+
+			if [[ "${line_blacklisted}" == "false" ]]; then
+				text_blacklisted="false"
+				for text_blacklist_item in "${text_blacklist[@]-}"; do
+					is_not_empty "${text_blacklist_item}" || continue
+					if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
+						text_blacklisted="maybe"
+					fi
+
+					if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
+						if [[ "${text_buffer}" == "${text_blacklist[0]}" ]]; then
+							mute="true"
+						fi
+						text_blacklisted="true"
+						text_buffer=""
+						break
+					fi
+				done
+
+				if [[ "${text_blacklisted}" == "false" ]]; then
+					echo -n "${text_buffer}"
+					text_buffer=""
+				fi
+			fi
 		fi
 	done
 }
@@ -1305,11 +1395,8 @@ main() {
 	# Create ISO image
 	# ==================================================================
 
-	create_iso_image "${iso_source_image}" "${global_tmp_directory}/InstallerDiskImage.cdr" || exit_with_error "Failed to create ISO image."
-
-	echo "Copying to target directory..."
 	global_incomplete_iso_target_image="${iso_target_image}"
-	mv -f "${global_tmp_directory}/InstallerDiskImage.cdr" "${iso_target_image}" &> /dev/null || exit_with_error "Failed to copy ISO image."
+	create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_error "Failed to create ISO image."
 	unset global_incomplete_iso_target_image
 
 	exit 0
