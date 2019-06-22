@@ -920,7 +920,7 @@ parse_create_iso_image() {
 				possible_empty_line="true"
 			fi
 
-			if [[ "${line_buffer}" =~ ^"${line_blacklist[0]}".*  ]]; then
+			if [[ "${line_buffer}" =~ ^"${line_blacklist[0]}".* ]]; then
 				echo -n "Creating ISO image: 0%..."
 				is_progress_line="true"
 			fi
