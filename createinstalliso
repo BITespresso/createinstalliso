@@ -1404,12 +1404,11 @@ main() {
 		# - macOS High Sierra 10.13
 		# - macOS Mojave 10.14
 		3 )
-			echo "Creating disk image..."
+			echo "Creating empty disk image..."
 			install_media_target_image="${global_tmp_directory}/InstallMedia.sparseimage"
 			install_media_target_volname="InstallMedia.${random_string}"
-			hdiutil create -size 12g "${install_media_target_image}" -type SPARSE -fs HFS+J -volname "${install_media_target_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
+			hdiutil create -size 16g "${install_media_target_image}" -type SPARSE -fs HFS+J -volname "${install_media_target_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
 			global_install_media_device_node="$(hdiutil attach "${install_media_target_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "Couldn't mount disk image."
-			echo "Create complete."
 
 			create_install_media "${installer_application_path}" "${install_media_target_volname}" || exit_with_error "Failed to create install media."
 
