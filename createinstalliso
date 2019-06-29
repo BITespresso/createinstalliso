@@ -878,14 +878,18 @@ script_hdiutil_makehybrid_was_canceled() {
 
 parse_create_iso_image() {
 	local char
+	local char_history=""
+	local last_four_chars
+	local mute="false"
 	local line_buffer=""
 	local line_blacklisted="false"
 	local line_blacklist_item
 	local -r -a line_blacklist=(
-		'Creating hybrid image...'
+		'Creating'
 		'hdiutil:'
 	)
 	local text_buffer=""
+	local text_buffer_with_dots
 	local text_blacklisted="false"
 	local text_blacklist_item
 	local -r -a text_blacklist=(
@@ -895,60 +899,52 @@ parse_create_iso_image() {
 	local -r shell_columns=$(tput cols)
 	local -r -i dots_count_max=$(( shell_columns - 2 ))
 	local -i dots_count=0
+	local -i dots_increment
 	local -i percent
 	local -i percent_step
 	local -i -r -a percent_steps=("20" "40" "60" "80" "100")
 	local -i last_percent=0
-	local mute="false"
-	local possible_empty_line="true"
 
 	while IFS= read -r -n1 -d "" char; do
 		if [[ "${mute}" == "true" ]]; then
 			continue
 		fi
 
-		if [[ ("${char}" != $'\r') && ("${char}" != $'\n') ]]; then
-			possible_empty_line="false"
+		if (( ${#char_history} > 4 )); then
+			last_four_chars="${char_history: -4}"
+		else
+			last_four_chars="${char_history}"
+		fi
+
+		char_history="${char_history}${char}"
+
+		if [[ ("${is_progress_line}" == "true") && ("${last_four_chars}" == $'\r\n\r\n') && ("${char}" != "." ) ]]; then
+			is_progress_line="false"
 		fi
 
 		line_buffer="${line_buffer}${char}"
 		text_buffer="${text_buffer}${char}"
 
 		if [[ "${char}" == $'\n' ]]; then
-			if [[ (! "${line_blacklisted}" == "true") && ("${possible_empty_line}" == "false") ]]; then
-				echo -n "${text_buffer}"
-				possible_empty_line="true"
+			if [[ "${last_four_chars}" =~ .*$'\r\n\r' ]]; then
+				text_buffer="${text_buffer:0:${#text_buffer}-1}"
 			fi
 
-			if [[ "${line_buffer}" =~ ^"${line_blacklist[0]}".* ]]; then
+			if [[ "${line_blacklisted}" != "true" ]]; then
+				echo -n "${text_buffer}"
+			elif [[ "${line_buffer}" =~ ^"Creating".* ]]; then
 				echo -n "Creating ISO image: 0%..."
 				is_progress_line="true"
 			fi
 
 			line_buffer=""
 			text_buffer=""
-		elif [[ ("${is_progress_line}" == "true") && ("${char}" == ".") ]]; then
-			(( dots_count++ ))
-			(( percent = (100 * dots_count) / dots_count_max ))
-
-			for percent_step in "${percent_steps[@]}"; do
-				if (( (last_percent < percent_step) && (percent >= percent_step) )); then
-					echo -n " ${percent_step}%"
-					if [[ "${percent_step}" != "100" ]]; then
-						echo -n "..."
-					fi
-				fi
-			done
-
-			(( last_percent = percent ))
-
-			line_buffer=""
-			text_buffer=""
 		else
-			is_progress_line="false"
 			line_blacklisted="false"
+
 			for line_blacklist_item in "${line_blacklist[@]-}"; do
 				is_not_empty "${line_blacklist_item}" || continue
+
 				if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
 					line_blacklisted="maybe"
 				fi
@@ -961,16 +957,19 @@ parse_create_iso_image() {
 
 			if [[ "${line_blacklisted}" == "false" ]]; then
 				text_blacklisted="false"
+
 				for text_blacklist_item in "${text_blacklist[@]-}"; do
 					is_not_empty "${text_blacklist_item}" || continue
+
 					if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
 						text_blacklisted="maybe"
 					fi
 
 					if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
-						if [[ "${text_buffer}" == "${text_blacklist[0]}" ]]; then
+						if [[ "${text_buffer}" == "canceling..." ]]; then
 							mute="true"
 						fi
+
 						text_blacklisted="true"
 						text_buffer=""
 						break
@@ -978,6 +977,29 @@ parse_create_iso_image() {
 				done
 
 				if [[ "${text_blacklisted}" == "false" ]]; then
+					if [[ "${is_progress_line}" == "true" ]]; then
+						text_buffer_with_dots="${text_buffer}"
+						text_buffer="${text_buffer//.}"
+						(( dots_increment = ${#text_buffer_with_dots} - ${#text_buffer} ))
+
+						if (( dots_increment > 0 )); then
+							(( dots_count += dots_increment ))
+							(( percent = (100 * dots_count) / dots_count_max ))
+
+							for percent_step in "${percent_steps[@]}"; do
+								if (( (last_percent < percent_step) && (percent >= percent_step) )); then
+									echo -n " ${percent_step}%"
+
+									if [[ "${percent_step}" != "100" ]]; then
+										echo -n "..."
+									fi
+								fi
+							done
+
+							(( last_percent = percent ))
+						fi
+					fi
+
 					echo -n "${text_buffer}"
 					text_buffer=""
 				fi
