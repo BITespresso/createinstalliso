@@ -898,12 +898,12 @@ parse_create_iso_image() {
 	local is_progress_line="false"
 	local -r shell_columns=$(tput cols)
 	local -r -i dots_count_max=$(( shell_columns - 2 ))
-	local -i dots_count=0
+	local -i dots_count="0"
 	local -i dots_increment
 	local -i percent
 	local -i percent_step
 	local -i -r -a percent_steps=("20" "40" "60" "80" "100")
-	local -i last_percent=0
+	local -i last_percent="0"
 
 	while IFS= read -r -n1 -d "" char; do
 		if [[ "${mute}" == "true" ]]; then
