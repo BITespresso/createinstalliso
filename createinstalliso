@@ -746,16 +746,17 @@ get_installer_minimum_macos_version() {
 create_install_media() {
 	local -r installer_application_path="$1"
 	local -r install_media_target_volname="$2"
+	local unused
 	local -i exit_status
 
 	is_not_empty "${installer_application_path}" || return 1
 	is_not_empty "${install_media_target_volname}" || return 1
 
 	if has_applicationpath_option "${installer_application_path}"; then
-		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media)
+		{ unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
 		exit_status="$?"
 	else
-		script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media)
+		{ unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
 		exit_status="$?"
 	fi
 
@@ -885,6 +886,7 @@ create_iso_image() {
 	local -r iso_target_image="$2"
 	local -r default_volume_name="$3"
 	local -r typescript_file="${global_tmp_directory}/typescript_hdiutil_makehybrid"
+	local unused
 	local -i exit_status
 
 	is_not_empty "${iso_source_image}" || return 1
@@ -893,7 +895,7 @@ create_iso_image() {
 
 	is_existing "${iso_source_image}" || return 1
 
-	script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2> /dev/null > >(parse_create_iso_image)
+	{ unused=$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2> /dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-); } 4>&1
 	exit_status="$?"
 
 	if script_hdiutil_makehybrid_was_canceled "${typescript_file}"; then
