@@ -776,70 +776,105 @@ script_createinstallmedia_was_canceled() {
 
 parse_create_install_media() {
 	local char
-	local line_buffer=""
-	local line_blacklisted="false"
-	local line_blacklist_item
-	local -r -a line_blacklist=(
-		'Erasing Disk: 0%...'
-		'Erasing disk: 0%...'
+	local text_buffer=""
+	local -r separator=$'\v'
+	local -r -a trigger_line_mute_array=(
+		'Erasing '
+		'Copy complete.'
 		'Done.'
 		'Install media now available at '
 	)
-	local text_buffer=""
-	local text_blacklisted="false"
-	local text_blacklist_item
-	local -r -a text_blacklist=(
+	local -r trigger_line_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
+	local -r -a trigger_text_mute_array=(
+		'Copying installer files to disk...'
+		'Copying to disk: 0%...'
 		' 10%...'
+		' 20%...'
 		' 30%...'
+		' 40%...'
 		' 50%...'
+		' 60%...'
 		' 70%...'
+		' 80%...'
 		' 90%...'
+		' 100%'
+		'Making disk bootable...'
 	)
+	local -r trigger_text_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_mute_array[@]}")"
+	local -r trigger_copying_line_array=(
+		'Copying installer files to disk...'
+		'Copying to disk: 0%...'
+	)
+	local -r trigger_copying_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_copying_line_array[@]}")"
+	local -r trigger_newline_mute_array=(
+		'Copying installer files to disk...'
+		' 100%'
+	)
+	local -r trigger_newline_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_newline_mute_array[@]}")"
+	local -r trigger_making_line_array=(
+		'Making disk bootable...'
+	)
+	local -r trigger_making_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_making_line_array[@]}")"
+	local is_line_mute="unknown"
+	local is_newline_mute="false"
+	local is_copying_line="false"
 
 	while IFS= read -r -n1 -d "" char; do
-		line_buffer="${line_buffer}${char}"
 		text_buffer="${text_buffer}${char}"
 
 		if [[ "${char}" == $'\n' ]]; then
-			if [[ ! "${line_blacklisted}" == "true" ]]; then
-				echo -n "${text_buffer}"
+			if [[ "${is_line_mute}" != "true" ]]; then
+				if [[ "${is_newline_mute}" == "true" ]]; then
+					echo -n "${text_buffer:0:${#text_buffer}-1}"
+				else
+					echo -n "${text_buffer}"
+				fi
 			fi
 
-			line_buffer=""
+			is_line_mute="unknown"
+			is_newline_mute="false"
 			text_buffer=""
+		elif [[ "${is_line_mute}" == "true" ]]; then
+			continue
 		else
-			line_blacklisted="false"
-			for line_blacklist_item in "${line_blacklist[@]-}"; do
-				is_not_empty "${line_blacklist_item}" || continue
-				if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
-					line_blacklisted="maybe"
-				fi
-
-				if [[ "${line_buffer}" =~ ^"${line_blacklist_item}".* ]]; then
-					line_blacklisted="true"
-					break
-				fi
-			done
-
-			if [[ "${line_blacklisted}" == "false" ]]; then
-				text_blacklisted="false"
-				for text_blacklist_item in "${text_blacklist[@]-}"; do
-					is_not_empty "${text_blacklist_item}" || continue
-					if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
-						text_blacklisted="maybe"
+			if [[ "${is_line_mute}" == "unknown" ]]; then
+				if [[ "${trigger_line_mute/"${separator}${text_buffer}"}" != "${trigger_line_mute}" ]]; then
+					if [[ "${trigger_line_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_line_mute}" ]]; then
+						is_line_mute="true"
 					fi
+				else
+					is_line_mute="false"
+				fi
+			fi
 
-					if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
-						text_blacklisted="true"
-						text_buffer=""
+			if [[ "${is_line_mute}" == "false" ]]; then
+				while (( "${#text_buffer}" > 0 )); do
+					if [[ "${trigger_text_mute/"${separator}${text_buffer}"}" != "${trigger_text_mute}" ]]; then
+						if [[ "${trigger_text_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_text_mute}" ]]; then
+							if [[ "${trigger_copying_line/"${separator}${text_buffer}${separator}"}" != "${trigger_copying_line}" ]]; then
+								is_copying_line="true"
+								echo -n "Copying installer files to disk image..."
+								echo -n $'\r\n'
+							fi
+
+							if [[ ("${is_copying_line}" == "true") && ("${trigger_newline_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_newline_mute}") ]]; then
+								is_copying_line="false"
+								is_newline_mute="true"
+							fi
+
+							if [[ "${trigger_making_line/"${separator}${text_buffer}${separator}"}" != "${trigger_making_line}" ]]; then
+								echo -n "Making disk image bootable..."
+							fi
+
+							text_buffer=""
+						fi
+
 						break
+					else
+						echo -n "${text_buffer:0:1}"
+						text_buffer="${text_buffer:1}"
 					fi
 				done
-
-				if [[ "${text_blacklisted}" == "false" ]]; then
-					echo -n "${text_buffer}"
-					text_buffer=""
-				fi
 			fi
 		fi
 	done
@@ -880,33 +915,40 @@ parse_create_iso_image() {
 	local char
 	local char_history=""
 	local last_four_chars
-	local mute="false"
-	local line_buffer=""
-	local line_blacklisted="false"
-	local line_blacklist_item
-	local -r -a line_blacklist=(
-		'Creating'
-		'hdiutil:'
-	)
 	local text_buffer=""
 	local text_buffer_with_dots
-	local text_blacklisted="false"
-	local text_blacklist_item
-	local -r -a text_blacklist=(
+	local -r separator=$'\v'
+	local -r -a trigger_line_mute_array=(
+		'Creating hybrid image...'
+		'hdiutil: '
+	)
+	local -r trigger_line_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
+	local -r -a trigger_progress_line_array=(
+		'Creating hybrid image...'
+	)
+	local -r trigger_progress_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_progress_line_array[@]}")"
+	local -r -a trigger_text_mute_array=(
 		'canceling...'
 	)
+	local -r trigger_text_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_mute_array[@]}")"
+	local -r -a trigger_mute_array=(
+		'canceling...'
+	)
+	local -r trigger_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_mute_array[@]}")"
+	local is_line_mute="unknown"
+	local is_mute="false"
 	local is_progress_line="false"
 	local -r shell_columns=$(tput cols)
-	local -r -i dots_count_max=$(( shell_columns - 2 ))
-	local -i dots_count="0"
-	local -i dots_increment
+	local -r -i dot_count_max=$(( shell_columns - 2 ))
+	local -i dot_count="0"
+	local -i dot_increment
 	local -i percent
 	local -i percent_step
 	local -i -r -a percent_steps=("20" "40" "60" "80" "100")
 	local -i last_percent="0"
 
 	while IFS= read -r -n1 -d "" char; do
-		if [[ "${mute}" == "true" ]]; then
+		if [[ "${is_mute}" == "true" ]]; then
 			continue
 		fi
 
@@ -922,7 +964,6 @@ parse_create_iso_image() {
 			is_progress_line="false"
 		fi
 
-		line_buffer="${line_buffer}${char}"
 		text_buffer="${text_buffer}${char}"
 
 		if [[ "${char}" == $'\n' ]]; then
@@ -930,79 +971,70 @@ parse_create_iso_image() {
 				text_buffer="${text_buffer:0:${#text_buffer}-1}"
 			fi
 
-			if [[ "${line_blacklisted}" != "true" ]]; then
+			if [[ "${is_line_mute}" != "true" ]]; then
 				echo -n "${text_buffer}"
-			elif [[ "${line_buffer}" =~ ^"Creating".* ]]; then
-				echo -n "Creating ISO image: 0%..."
-				is_progress_line="true"
 			fi
 
-			line_buffer=""
+			is_line_mute="unknown"
 			text_buffer=""
+		elif [[ "${is_line_mute}" == "true" ]]; then
+			continue
 		else
-			line_blacklisted="false"
-
-			for line_blacklist_item in "${line_blacklist[@]-}"; do
-				is_not_empty "${line_blacklist_item}" || continue
-
-				if [[ ("${#line_blacklist_item}" -gt "${#line_buffer}") && ("${line_blacklist_item}" =~ ^"${line_buffer}".*) ]]; then
-					line_blacklisted="maybe"
-				fi
-
-				if [[ "${line_buffer}" =~ ^"${line_blacklist_item}".* ]]; then
-					line_blacklisted="true"
-					break
-				fi
-			done
-
-			if [[ "${line_blacklisted}" == "false" ]]; then
-				text_blacklisted="false"
-
-				for text_blacklist_item in "${text_blacklist[@]-}"; do
-					is_not_empty "${text_blacklist_item}" || continue
-
-					if [[ ("${#text_blacklist_item}" -gt "${#text_buffer}") && ("${text_blacklist_item}" =~ ^"${text_buffer}".*) ]]; then
-						text_blacklisted="maybe"
-					fi
-
-					if [[ "${text_buffer}" == "${text_blacklist_item}" ]]; then
-						if [[ "${text_buffer}" == "canceling..." ]]; then
-							mute="true"
+			if [[ "${is_line_mute}" == "unknown" ]]; then
+				if [[ "${trigger_line_mute/"${separator}${text_buffer}"}" != "${trigger_line_mute}" ]]; then
+					if [[ "${trigger_line_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_line_mute}" ]]; then
+						if [[ "${trigger_progress_line/"${separator}${text_buffer}${separator}"}" != "${trigger_progress_line}" ]]; then
+							is_progress_line="true"
+							echo -n "Creating ISO image: 0%..."
 						fi
 
-						text_blacklisted="true"
-						text_buffer=""
+						is_line_mute="true"
+					fi
+				else
+					is_line_mute="false"
+				fi
+			fi
+
+			if [[ "${is_line_mute}" == "false" ]]; then
+				while (( "${#text_buffer}" > 0 )); do
+					if [[ "${trigger_text_mute/"${separator}${text_buffer}"}" != "${trigger_text_mute}" ]]; then
+						if [[ "${trigger_text_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_text_mute}" ]]; then
+							if [[ "${trigger_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_mute}" ]]; then
+								is_mute="true"
+							fi
+
+							text_buffer=""
+						fi
+
 						break
+					else
+						if [[ "${is_progress_line}" == "true" ]]; then
+							text_buffer_with_dots="${text_buffer}"
+							text_buffer="${text_buffer//.}"
+							(( dot_increment = ${#text_buffer_with_dots} - ${#text_buffer} ))
+
+							if (( dot_increment > 0 )); then
+								(( dot_count += dot_increment ))
+								(( percent = (100 * dot_count) / dot_count_max ))
+
+								for percent_step in "${percent_steps[@]}"; do
+									if (( (last_percent < percent_step) && (percent >= percent_step) )); then
+										echo -n " ${percent_step}%"
+
+										if [[ "${percent_step}" != "100" ]]; then
+											echo -n "..."
+										fi
+									fi
+								done
+
+								(( last_percent = percent ))
+							fi
+						fi
+
+						echo -n "${text_buffer:0:1}"
+						text_buffer="${text_buffer:1}"
 					fi
 				done
-
-				if [[ "${text_blacklisted}" == "false" ]]; then
-					if [[ "${is_progress_line}" == "true" ]]; then
-						text_buffer_with_dots="${text_buffer}"
-						text_buffer="${text_buffer//.}"
-						(( dots_increment = ${#text_buffer_with_dots} - ${#text_buffer} ))
-
-						if (( dots_increment > 0 )); then
-							(( dots_count += dots_increment ))
-							(( percent = (100 * dots_count) / dots_count_max ))
-
-							for percent_step in "${percent_steps[@]}"; do
-								if (( (last_percent < percent_step) && (percent >= percent_step) )); then
-									echo -n " ${percent_step}%"
-
-									if [[ "${percent_step}" != "100" ]]; then
-										echo -n "..."
-									fi
-								fi
-							done
-
-							(( last_percent = percent ))
-						fi
-					fi
-
-					echo -n "${text_buffer}"
-					text_buffer=""
-				fi
 			fi
 		fi
 	done
