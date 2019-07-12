@@ -79,7 +79,6 @@ declare -r -a const_macos_names=(
 	"macOS Catalina"        # 10.15 "Catalina"
 )
 
-unset global_exit_message
 unset global_tmp_directory
 unset global_install_media_device_node
 unset global_incomplete_iso_target_image
@@ -92,11 +91,6 @@ declare -i global_exit_with_error_exit_status="1"
 exit_handler() {
 	trap - EXIT
 	cleanup
-
-	if is_not_empty "${global_exit_message-}"; then
-		echo "${global_exit_message}"
-		unset global_exit_message
-	fi
 }
 
 signal_handler() {
@@ -105,7 +99,6 @@ signal_handler() {
 	trap - EXIT
 	cleanup
 
-	unset global_exit_message
 	exit "${exit_status}"
 }
 
@@ -1400,14 +1393,8 @@ main() {
 	fi
 
 	# Once the script has reached this point of execution, it will
-	# return with exit status zero in case of an error and issue an exit
-	# message before exiting.
-	#
-	# NOTE: This behavior is intended to replicate the behavior of
-	# Apple's command 'createinstallmedia' for creation of a bootable
-	# installer USB flash drive or other volume.
-	global_exit_with_error_exit_status="0"
-	global_exit_message="Done."
+	# return with exit status 250 in case of an error.
+	global_exit_with_error_exit_status="250"
 
 	# ==================================================================
 	# Create source image for ISO image
@@ -1462,6 +1449,7 @@ main() {
 	create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_error "Failed to create ISO image."
 	unset global_incomplete_iso_target_image
 
+	echo "Install ISO image now available at \"${iso_target_image}\""
 	exit 0
 }
 
