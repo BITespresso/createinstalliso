@@ -772,16 +772,9 @@ parse_create_install_media() {
 	local char
 	local text_buffer=""
 	local -r separator=$'\v'
-	local -r -a trigger_line_mute_array=(
-		'Erasing '
-		'Copy complete.'
-		'Done.'
-		'Install media now available at '
-	)
-	local -r trigger_line_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
-	local -r -a trigger_text_mute_array=(
-		'Copying installer files to disk...'
-		'Copying to disk: 0%...'
+	local -r -a trigger_text_array=(
+		'Erasing Disk: 0%...'
+		'Erasing disk: 0%...'
 		' 10%...'
 		' 20%...'
 		' 30%...'
@@ -791,33 +784,49 @@ parse_create_install_media() {
 		' 70%...'
 		' 80%...'
 		' 90%...'
+		'100%...'
 		' 100%'
+		'Copying installer files to disk...'
+		'Copying to disk: 0%...'
+		'Copy complete.'
 		'Making disk bootable...'
+		'Done.'
+		'Install media now available at '
 	)
-	local -r trigger_text_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_mute_array[@]}")"
+	local -r trigger_text="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_array[@]}")"
+	local -r -a trigger_line_mute_array=(
+		'Copy complete.'
+		'Done.'
+		'Install media now available at '
+	)
+	local -r trigger_line_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
+	local -r trigger_newline_mute_array=(
+		'100%...'
+		' 100%'
+		'Copying installer files to disk...'
+	)
 	local -r trigger_copying_line_array=(
 		'Copying installer files to disk...'
 		'Copying to disk: 0%...'
 	)
 	local -r trigger_copying_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_copying_line_array[@]}")"
-	local -r trigger_newline_mute_array=(
-		'Copying installer files to disk...'
-		' 100%'
-	)
 	local -r trigger_newline_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_newline_mute_array[@]}")"
 	local -r trigger_making_line_array=(
 		'Making disk bootable...'
 	)
 	local -r trigger_making_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_making_line_array[@]}")"
-	local is_line_mute="unknown"
+	local is_line_mute="false"
 	local is_newline_mute="false"
-	local is_copying_line="false"
 
 	while IFS= read -r -n1 -d "" char; do
+		if [[ ("${is_line_mute}" == "true") && ("${char}" != $'\n') ]]; then
+			continue
+		fi
+
 		text_buffer="${text_buffer}${char}"
 
 		if [[ "${char}" == $'\n' ]]; then
-			if [[ "${is_line_mute}" != "true" ]]; then
+			if [[ "${is_line_mute}" == "false" ]]; then
 				if [[ "${is_newline_mute}" == "true" ]]; then
 					echo -n "${text_buffer:0:${#text_buffer}-1}"
 				else
@@ -825,53 +834,43 @@ parse_create_install_media() {
 				fi
 			fi
 
-			is_line_mute="unknown"
+			is_line_mute="false"
 			is_newline_mute="false"
 			text_buffer=""
-		elif [[ "${is_line_mute}" == "true" ]]; then
-			continue
 		else
-			if [[ "${is_line_mute}" == "unknown" ]]; then
-				if [[ "${trigger_line_mute/"${separator}${text_buffer}"}" != "${trigger_line_mute}" ]]; then
-					if [[ "${trigger_line_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_line_mute}" ]]; then
-						is_line_mute="true"
-					fi
-				else
-					is_line_mute="false"
-				fi
-			fi
-
-			if [[ "${is_line_mute}" == "false" ]]; then
-				while (( "${#text_buffer}" > 0 )); do
-					if [[ "${trigger_text_mute/"${separator}${text_buffer}"}" != "${trigger_text_mute}" ]]; then
-						if [[ "${trigger_text_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_text_mute}" ]]; then
-							if [[ "${trigger_copying_line/"${separator}${text_buffer}${separator}"}" != "${trigger_copying_line}" ]]; then
-								is_copying_line="true"
-								echo -n "Copying installer files to disk image..."
-								echo -n $'\r\n'
-							fi
-
-							if [[ ("${is_copying_line}" == "true") && ("${trigger_newline_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_newline_mute}") ]]; then
-								is_copying_line="false"
-								is_newline_mute="true"
-							fi
-
-							if [[ "${trigger_making_line/"${separator}${text_buffer}${separator}"}" != "${trigger_making_line}" ]]; then
-								echo -n "Making disk image bootable..."
-							fi
-
-							text_buffer=""
+			while (( "${#text_buffer}" > 0 )); do
+				if [[ "${trigger_text/"${separator}${text_buffer}"}" != "${trigger_text}" ]]; then
+					if [[ "${trigger_text/"${separator}${text_buffer}${separator}"}" != "${trigger_text}" ]]; then
+						if [[ "${trigger_line_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_line_mute}" ]]; then
+							is_line_mute="true"
 						fi
 
-						break
-					else
-						echo -n "${text_buffer:0:1}"
-						text_buffer="${text_buffer:1}"
+						if [[ "${trigger_newline_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_newline_mute}" ]]; then
+							is_newline_mute="true"
+						fi
+
+						if [[ "${trigger_copying_line/"${separator}${text_buffer}${separator}"}" != "${trigger_copying_line}" ]]; then
+							echo -n "Copying installer files to disk image..."
+							echo -n $'\r\n'
+						fi
+
+						if [[ "${trigger_making_line/"${separator}${text_buffer}${separator}"}" != "${trigger_making_line}" ]]; then
+							echo -n "Making disk image bootable..."
+						fi
+
+						text_buffer=""
 					fi
-				done
-			fi
+
+					break
+				else
+					echo -n "${text_buffer:0:1}"
+					text_buffer="${text_buffer:1}"
+				fi
+			done
 		fi
 	done
+
+	echo -n "${text_buffer}"
 }
 
 create_iso_image() {
@@ -913,6 +912,12 @@ parse_create_iso_image() {
 	local text_buffer=""
 	local text_buffer_with_dots
 	local -r separator=$'\v'
+	local -r -a trigger_text_array=(
+		'Creating hybrid image...'
+		'hdiutil: '
+		'canceling...'
+	)
+	local -r trigger_text="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_array[@]}")"
 	local -r -a trigger_line_mute_array=(
 		'Creating hybrid image...'
 		'hdiutil: '
@@ -922,15 +927,11 @@ parse_create_iso_image() {
 		'Creating hybrid image...'
 	)
 	local -r trigger_progress_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_progress_line_array[@]}")"
-	local -r -a trigger_text_mute_array=(
-		'canceling...'
-	)
-	local -r trigger_text_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_mute_array[@]}")"
 	local -r -a trigger_mute_array=(
 		'canceling...'
 	)
 	local -r trigger_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_mute_array[@]}")"
-	local is_line_mute="unknown"
+	local is_line_mute="false"
 	local is_mute="false"
 	local is_progress_line="false"
 	local -r shell_columns=$(tput cols)
@@ -943,7 +944,7 @@ parse_create_iso_image() {
 	local -i last_percent="0"
 
 	while IFS= read -r -n1 -d "" char; do
-		if [[ "${is_mute}" == "true" ]]; then
+		if [[ (("${is_line_mute}" == "true") && ("${char}" != $'\n')) || ("${is_mute}" == "true") ]]; then
 			continue
 		fi
 
@@ -966,73 +967,65 @@ parse_create_iso_image() {
 				text_buffer="${text_buffer:0:${#text_buffer}-1}"
 			fi
 
-			if [[ "${is_line_mute}" != "true" ]]; then
+			if [[ "${is_line_mute}" == "false" ]]; then
 				echo -n "${text_buffer}"
 			fi
 
-			is_line_mute="unknown"
+			is_line_mute="false"
 			text_buffer=""
-		elif [[ "${is_line_mute}" == "true" ]]; then
-			continue
 		else
-			if [[ "${is_line_mute}" == "unknown" ]]; then
-				if [[ "${trigger_line_mute/"${separator}${text_buffer}"}" != "${trigger_line_mute}" ]]; then
-					if [[ "${trigger_line_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_line_mute}" ]]; then
+			while (( "${#text_buffer}" > 0 )); do
+				if [[ "${trigger_text/"${separator}${text_buffer}"}" != "${trigger_text}" ]]; then
+					if [[ "${trigger_text/"${separator}${text_buffer}${separator}"}" != "${trigger_text}" ]]; then
+						if [[ "${trigger_line_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_line_mute}" ]]; then
+							is_line_mute="true"
+						fi
+
 						if [[ "${trigger_progress_line/"${separator}${text_buffer}${separator}"}" != "${trigger_progress_line}" ]]; then
 							is_progress_line="true"
 							echo -n "Creating ISO image: 0%..."
 						fi
 
-						is_line_mute="true"
+						if [[ "${trigger_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_mute}" ]]; then
+							is_mute="true"
+						fi
+
+						text_buffer=""
 					fi
+
+					break
 				else
-					is_line_mute="false"
-				fi
-			fi
+					if [[ "${is_progress_line}" == "true" ]]; then
+						text_buffer_with_dots="${text_buffer}"
+						text_buffer="${text_buffer//.}"
+						(( dot_increment = ${#text_buffer_with_dots} - ${#text_buffer} ))
 
-			if [[ "${is_line_mute}" == "false" ]]; then
-				while (( "${#text_buffer}" > 0 )); do
-					if [[ "${trigger_text_mute/"${separator}${text_buffer}"}" != "${trigger_text_mute}" ]]; then
-						if [[ "${trigger_text_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_text_mute}" ]]; then
-							if [[ "${trigger_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_mute}" ]]; then
-								is_mute="true"
-							fi
+						if (( dot_increment > 0 )); then
+							(( dot_count += dot_increment ))
+							(( percent = (100 * dot_count) / dot_count_max ))
 
-							text_buffer=""
-						fi
+							for percent_step in "${percent_steps[@]}"; do
+								if (( (last_percent < percent_step) && (percent >= percent_step) )); then
+									echo -n " ${percent_step}%"
 
-						break
-					else
-						if [[ "${is_progress_line}" == "true" ]]; then
-							text_buffer_with_dots="${text_buffer}"
-							text_buffer="${text_buffer//.}"
-							(( dot_increment = ${#text_buffer_with_dots} - ${#text_buffer} ))
-
-							if (( dot_increment > 0 )); then
-								(( dot_count += dot_increment ))
-								(( percent = (100 * dot_count) / dot_count_max ))
-
-								for percent_step in "${percent_steps[@]}"; do
-									if (( (last_percent < percent_step) && (percent >= percent_step) )); then
-										echo -n " ${percent_step}%"
-
-										if [[ "${percent_step}" != "100" ]]; then
-											echo -n "..."
-										fi
+									if [[ "${percent_step}" != "100" ]]; then
+										echo -n "..."
 									fi
-								done
+								fi
+							done
 
-								(( last_percent = percent ))
-							fi
+							(( last_percent = percent ))
 						fi
-
-						echo -n "${text_buffer:0:1}"
-						text_buffer="${text_buffer:1}"
 					fi
-				done
-			fi
+
+					echo -n "${text_buffer:0:1}"
+					text_buffer="${text_buffer:1}"
+				fi
+			done
 		fi
 	done
+
+	echo -n "${text_buffer}"
 }
 
 # ----------------------------------------------------------------------
