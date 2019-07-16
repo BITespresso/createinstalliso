@@ -80,7 +80,9 @@ declare -r -a const_macos_names=(
 )
 
 unset global_tmp_directory
-unset global_install_media_device_node
+unset global_install_esd_mountpoint
+unset global_install_disk_mountpoint
+unset global_install_disk_device_node
 unset global_incomplete_iso_target_image
 declare -i global_exit_with_error_exit_status="1"
 
@@ -104,8 +106,16 @@ signal_handler() {
 
 cleanup() {
 	if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
-		if is_not_empty "${global_install_media_device_node-}" && is_existing "${global_install_media_device_node}"; then
-			hdiutil detach "${global_install_media_device_node}" -force &> /dev/null && unset global_install_media_device_node
+		if is_not_empty "${global_install_esd_mountpoint-}" && is_existing "${global_install_esd_mountpoint}"; then
+			hdiutil detach "${global_install_esd_mountpoint}" -force &> /dev/null && unset global_install_esd_mountpoint
+		fi
+
+		if is_not_empty "${global_install_disk_mountpoint-}" && is_existing "${global_install_disk_mountpoint}"; then
+			hdiutil detach "${global_install_disk_mountpoint}" -force &> /dev/null && unset global_install_disk_mountpoint
+		fi
+
+		if is_not_empty "${global_install_disk_device_node-}" && is_existing "${global_install_disk_device_node}"; then
+			hdiutil detach "${global_install_disk_device_node}" -force &> /dev/null && unset global_install_disk_device_node
 		fi
 
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
@@ -738,18 +748,18 @@ get_installer_minimum_macos_version() {
 
 create_install_media() {
 	local -r installer_application_path="$1"
-	local -r install_media_target_volname="$2"
+	local -r install_disk_volname="$2"
 	local unused
 	local -i exit_status
 
 	is_not_empty "${installer_application_path}" || return 1
-	is_not_empty "${install_media_target_volname}" || return 1
+	is_not_empty "${install_disk_volname}" || return 1
 
 	if has_applicationpath_option "${installer_application_path}"; then
-		{ unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
+		{ unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
 		exit_status="$?"
 	else
-		{ unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_media_target_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
+		{ unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
 		exit_status="$?"
 	fi
 
@@ -1394,8 +1404,12 @@ main() {
 	# ==================================================================
 
 	local iso_source_image
-	local install_media_target_image
-	local install_media_target_volname
+	local install_esd_image
+	local install_esd_shadow
+	local base_system_image
+	local install_disk_image
+	local install_disk_volname
+	local core_services_directory
 
 	case "${installer_application_type}" in
 
@@ -1411,6 +1425,38 @@ main() {
 		# - OS X Yosemite 10.10
 		# - OS X El Capitan 10.11
 		2 )
+			install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+			install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
+			global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
+			hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify &> /dev/null || exit_with_error "Mount of outer dmg failed."
+
+			base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
+			is_file "${base_system_image}" || exit_with_error "BaseSystem missing from the outer dmg, damaged installer image?"
+
+			install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
+			global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
+
+			echo "Creating disk image from installer image..."
+			hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap &> /dev/null || exit_with_error "Failed to convert BaseSystem.dmg."
+			hdiutil resize -size 16g "${install_disk_image}" &> /dev/null || exit_with_error "Failed to resize disk image."
+			hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify &> /dev/null || exit_with_error "The disk image did not mount."
+
+			echo "Copying installer files to disk image..."
+			rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" &> /dev/null || exit_with_error "Failed to delete Packages symlink."
+			cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" &> /dev/null || exit_with_error "Failed to copy Packages directory."
+
+			echo "Making disk image bootable..."
+			core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
+			bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" &> /dev/null || exit_with_error "The bless of the installer disk image failed."
+
+			echo "Copying installer image..."
+			cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.dmg."
+			cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.chunklist."
+
+			hdiutil detach "${global_install_disk_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+			unset global_install_disk_mountpoint
+
+			iso_source_image="${install_disk_image}"
 			;;
 
 		# '3' - Installer application type for:
@@ -1419,17 +1465,17 @@ main() {
 		# - macOS Mojave 10.14
 		3 )
 			echo "Creating empty disk image..."
-			install_media_target_image="${global_tmp_directory}/InstallMedia.sparseimage"
-			install_media_target_volname="InstallMedia.${random_string}"
-			hdiutil create -size 16g "${install_media_target_image}" -type SPARSE -fs HFS+J -volname "${install_media_target_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
-			global_install_media_device_node="$(hdiutil attach "${install_media_target_image}" -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "The disk image did not mount."
+			install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
+			install_disk_volname="InstallMedia.${random_string}"
+			hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
+			global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "The disk image did not mount."
 
-			create_install_media "${installer_application_path}" "${install_media_target_volname}" || exit_with_error "Failed to convert disk image to bootable install media."
+			create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_error "Failed to convert disk image to bootable install media."
 
-			hdiutil detach "${global_install_media_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
-			unset global_install_media_device_node
+			hdiutil detach "${global_install_disk_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+			unset global_install_disk_device_node
 
-			iso_source_image="${install_media_target_image}"
+			iso_source_image="${install_disk_image}"
 			;;
 
 	esac
@@ -1442,7 +1488,7 @@ main() {
 	create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_error "Failed to create ISO image."
 	unset global_incomplete_iso_target_image
 
-	echo "Install ISO image now available at \"${iso_target_image}\""
+	echo "Install ISO image now available at \"${target_directory_path}/\""
 	exit 0
 }
 
