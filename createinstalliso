@@ -106,17 +106,9 @@ signal_handler() {
 
 cleanup() {
 	if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
-		if is_not_empty "${global_install_esd_mountpoint-}" && is_existing "${global_install_esd_mountpoint}"; then
-			hdiutil detach "${global_install_esd_mountpoint}" -force &> /dev/null && unset global_install_esd_mountpoint
-		fi
-
-		if is_not_empty "${global_install_disk_mountpoint-}" && is_existing "${global_install_disk_mountpoint}"; then
-			hdiutil detach "${global_install_disk_mountpoint}" -force &> /dev/null && unset global_install_disk_mountpoint
-		fi
-
-		if is_not_empty "${global_install_disk_device_node-}" && is_existing "${global_install_disk_device_node}"; then
-			hdiutil detach "${global_install_disk_device_node}" -force &> /dev/null && unset global_install_disk_device_node
-		fi
+		detach_for_cleanup "global_install_esd_mountpoint"
+		detach_for_cleanup "global_install_disk_mountpoint"
+		detach_for_cleanup "global_install_disk_device_node"
 
 		rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
 	fi
@@ -126,6 +118,14 @@ cleanup() {
 	fi
 
 	return 0
+}
+
+detach_for_cleanup() {
+	local -r variable_name="$1"
+
+	if is_not_empty "${!variable_name-}" && is_existing "${!variable_name}"; then
+		hdiutil detach "${!variable_name}" -force &> /dev/null && unset "${variable_name}"
+	fi
 }
 
 echo_warning() {
