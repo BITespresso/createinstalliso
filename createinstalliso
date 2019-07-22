@@ -1453,6 +1453,9 @@ main() {
 			cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.dmg."
 			cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.chunklist."
 
+			hdiutil detach "${global_install_esd_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+			unset global_install_esd_mountpoint
+
 			hdiutil detach "${global_install_disk_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
 			unset global_install_disk_mountpoint
 
