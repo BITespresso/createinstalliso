@@ -140,16 +140,15 @@ echo_error() {
 }
 
 echo_error_usage() {
-	cat <<-EOF 1>&2
-	Usage: ${const_script_name} --targetdirectory <path to target directory> --applicationpath <path to OS installer application> [--nointeraction]
+	echo_error "Usage: ${const_script_name} --targetdirectory <path to target directory> --applicationpath <path to OS installer application> [--nointeraction]"
+	echo_error
+	echo_error "Arguments"
+	echo_error "--targetdirectory, A path to a directory where the installer ISO image will be created."
+	echo_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
+	echo_error "--nointeraction, Delete an existing ISO image without prompting for confirmation."
+	echo_error
+	echo_error "Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath \"/Applications/$(get_example_installer_application_name)\""
 
-	Arguments
-	--targetdirectory, A path to a directory where the installer ISO image will be created.
-	--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from.
-	--nointeraction, Delete an existing ISO image without prompting for confirmation.
-
-	Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath "/Applications/$(get_example_installer_application_name)"
-EOF
 	if ! is_root; then
 		echo_error
 		echo_error "This tool must be run as root."
