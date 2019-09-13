@@ -517,7 +517,7 @@ create_macos_name_and_version() {
 
     (( --largest_known_macos_minor_version ))
 
-    if (( macos_minor_version < 0 || macos_patch_version < 0 )); then
+    if (( (macos_minor_version < 0) || (macos_patch_version < 0) )); then
         return 1
     fi
 
