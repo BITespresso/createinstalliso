@@ -110,11 +110,11 @@ cleanup() {
         detach_for_cleanup "global_install_disk_mountpoint"
         detach_for_cleanup "global_install_disk_device_node"
 
-        rm -rf "${global_tmp_directory}" &> /dev/null && unset global_tmp_directory
+        rm -rf "${global_tmp_directory}" &>/dev/null && unset global_tmp_directory
     fi
 
     if is_not_empty "${global_incomplete_iso_target_image-}" && is_existing "${global_incomplete_iso_target_image}"; then
-        rm -rf "${global_incomplete_iso_target_image}" &> /dev/null && unset global_incomplete_iso_target_image
+        rm -rf "${global_incomplete_iso_target_image}" &>/dev/null && unset global_incomplete_iso_target_image
     fi
 
     return 0
@@ -124,7 +124,7 @@ detach_for_cleanup() {
     local -r variable_name="$1"
 
     if is_not_empty "${!variable_name-}" && is_existing "${!variable_name}"; then
-        hdiutil detach "${!variable_name}" -force &> /dev/null && unset "${variable_name}"
+        hdiutil detach "${!variable_name}" -force &>/dev/null && unset "${variable_name}"
     fi
 }
 
@@ -470,7 +470,7 @@ is_array_item() {
 has_applicationpath_option() {
     local -r installer_application_path="$1"
 
-    "${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" &> /dev/null
+    "${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" &>/dev/null
 }
 
 # ----------------------------------------------------------------------
@@ -490,7 +490,7 @@ execute_plist_buddy_command() {
     is_not_empty "${plist_command}" || return 1
     is_not_empty "${plist_file}" || return 1
 
-    /usr/libexec/PlistBuddy -c "${plist_command}" "${plist_file}" 2> /dev/null
+    /usr/libexec/PlistBuddy -c "${plist_command}" "${plist_file}" 2>/dev/null
 }
 
 # ----------------------------------------------------------------------
@@ -502,7 +502,7 @@ execute_plist_buddy_command() {
 get_os_name() {
     local os_name
 
-    os_name="$(uname -s 2> /dev/null)" || return 1
+    os_name="$(uname -s 2>/dev/null)" || return 1
 
     echo "${os_name}"
     return 0
@@ -755,10 +755,10 @@ create_install_media() {
     is_not_empty "${install_disk_volname}" || return 1
 
     if has_applicationpath_option "${installer_application_path}"; then
-        { unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --applicationpath "${installer_application_path}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
+        { unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --applicationpath "${installer_application_path}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
         exit_status="$?"
     else
-        { unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --nointeraction 2> /dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
+        { unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
         exit_status="$?"
     fi
 
@@ -896,7 +896,7 @@ create_iso_image() {
 
     is_existing "${iso_source_image}" || return 1
 
-    { unused=$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2> /dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-); } 4>&1
+    { unused=$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2>/dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-); } 4>&1
     exit_status="$?"
 
     if script_hdiutil_makehybrid_was_canceled "${typescript_file}"; then
@@ -911,7 +911,7 @@ script_hdiutil_makehybrid_was_canceled() {
 
     is_not_empty "${typescript_file}" || return 1
 
-    grep --regexp="canceling\.\.\." "${typescript_file}" &> /dev/null
+    grep --regexp="canceling\.\.\." "${typescript_file}" &>/dev/null
 }
 
 parse_create_iso_image() {
@@ -1159,7 +1159,7 @@ main() {
         exit 1
     fi
 
-    macos_version_string="$(sw_vers -productVersion 2> /dev/null)" || exit_with_error "Couldn't get macOS version."
+    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" || exit_with_error "Couldn't get macOS version."
     IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_error "Couldn't get macOS version."
     macos_major_version="${macos_version[0]:-0}"
     macos_minor_version="${macos_version[1]:-0}"
@@ -1391,7 +1391,7 @@ main() {
             fi
         fi
 
-        rm -rf "${iso_target_image}" &> /dev/null || exit_with_error "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
+        rm -rf "${iso_target_image}" &>/dev/null || exit_with_error "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
     fi
 
     # Once the script has reached this point of execution, it will
@@ -1427,7 +1427,7 @@ main() {
             install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
             install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
             global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
-            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify &> /dev/null || exit_with_error "Mount of outer dmg failed."
+            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify &>/dev/null || exit_with_error "Mount of outer dmg failed."
 
             base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
             is_file "${base_system_image}" || exit_with_error "BaseSystem missing from the outer dmg, damaged installer image?"
@@ -1436,26 +1436,26 @@ main() {
             global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
 
             echo "Creating disk image from installer image..."
-            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap &> /dev/null || exit_with_error "Failed to convert BaseSystem.dmg."
-            hdiutil resize -size 16g "${install_disk_image}" &> /dev/null || exit_with_error "Failed to resize disk image."
-            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify &> /dev/null || exit_with_error "The disk image did not mount."
+            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap &>/dev/null || exit_with_error "Failed to convert BaseSystem.dmg."
+            hdiutil resize -size 16g "${install_disk_image}" &>/dev/null || exit_with_error "Failed to resize disk image."
+            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify &>/dev/null || exit_with_error "The disk image did not mount."
 
             echo "Copying installer files to disk image..."
-            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" &> /dev/null || exit_with_error "Failed to delete Packages symlink."
-            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" &> /dev/null || exit_with_error "Failed to copy Packages directory."
+            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" &>/dev/null || exit_with_error "Failed to delete Packages symlink."
+            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" &>/dev/null || exit_with_error "Failed to copy Packages directory."
 
             echo "Making disk image bootable..."
             core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
-            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" &> /dev/null || exit_with_error "The bless of the installer disk image failed."
+            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" &>/dev/null || exit_with_error "The bless of the installer disk image failed."
 
             echo "Copying installer image..."
-            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.dmg."
-            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" &> /dev/null || exit_with_error "Failed to copy BaseSystem.chunklist."
+            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" &>/dev/null || exit_with_error "Failed to copy BaseSystem.dmg."
+            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" &>/dev/null || exit_with_error "Failed to copy BaseSystem.chunklist."
 
-            hdiutil detach "${global_install_esd_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+            hdiutil detach "${global_install_esd_mountpoint}" -force &>/dev/null || exit_with_error "Couldn't unmount disk image."
             unset global_install_esd_mountpoint
 
-            hdiutil detach "${global_install_disk_mountpoint}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+            hdiutil detach "${global_install_disk_mountpoint}" -force &>/dev/null || exit_with_error "Couldn't unmount disk image."
             unset global_install_disk_mountpoint
 
             iso_source_image="${install_disk_image}"
@@ -1469,12 +1469,12 @@ main() {
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
             install_disk_volname="InstallMedia.${random_string}"
-            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" &> /dev/null || exit_with_error "Failed to create disk image."
-            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2> /dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "The disk image did not mount."
+            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" &>/dev/null || exit_with_error "Failed to create disk image."
+            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "The disk image did not mount."
 
             create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_error "Failed to convert disk image to bootable install media."
 
-            hdiutil detach "${global_install_disk_device_node}" -force &> /dev/null || exit_with_error "Couldn't unmount disk image."
+            hdiutil detach "${global_install_disk_device_node}" -force &>/dev/null || exit_with_error "Couldn't unmount disk image."
             unset global_install_disk_device_node
 
             iso_source_image="${install_disk_image}"
