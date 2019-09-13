@@ -755,10 +755,10 @@ create_install_media() {
     is_not_empty "${install_disk_volname}" || return 1
 
     if has_applicationpath_option "${installer_application_path}"; then
-        { unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --applicationpath "${installer_application_path}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
+        { unused="$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --applicationpath "${installer_application_path}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-)"; } 4>&1
         exit_status="$?"
     else
-        { unused=$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-); } 4>&1
+        { unused="$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-)"; } 4>&1
         exit_status="$?"
     fi
 
@@ -896,7 +896,7 @@ create_iso_image() {
 
     is_existing "${iso_source_image}" || return 1
 
-    { unused=$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2>/dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-); } 4>&1
+    { unused="$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2>/dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-)"; } 4>&1
     exit_status="$?"
 
     if script_hdiutil_makehybrid_was_canceled "${typescript_file}"; then
@@ -943,8 +943,8 @@ parse_create_iso_image() {
     local is_line_mute="false"
     local is_mute="false"
     local is_progress_line="false"
-    local -r shell_columns=$(tput cols)
-    local -r -i dot_count_max=$(( shell_columns - 2 ))
+    local -r shell_columns="$(tput cols)"
+    local -r -i dot_count_max="$(( shell_columns - 2 ))"
     local -i dot_count="0"
     local -i dot_increment
     local -i percent
