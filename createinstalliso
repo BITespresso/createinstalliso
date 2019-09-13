@@ -116,8 +116,6 @@ cleanup() {
     if is_not_empty "${global_incomplete_iso_target_image-}" && is_existing "${global_incomplete_iso_target_image}"; then
         rm -rf "${global_incomplete_iso_target_image}" &>/dev/null && unset global_incomplete_iso_target_image
     fi
-
-    return 0
 }
 
 detach_for_cleanup() {
@@ -131,12 +129,10 @@ detach_for_cleanup() {
 echo_warning() {
     echo -n "WARNING: " 1>&2
     echo "$@" 1>&2
-    return 0
 }
 
 echo_error() {
     echo "$@" 1>&2
-    return 0
 }
 
 echo_error_usage() {
@@ -153,7 +149,6 @@ echo_error_usage() {
         echo_error
         echo_error "This tool must be run as root."
     fi
-    return 0
 }
 
 is_not_empty() {
@@ -505,7 +500,6 @@ get_os_name() {
     os_name="$(uname -s 2>/dev/null)" || return 1
 
     echo "${os_name}"
-    return 0
 }
 
 create_macos_name_and_version() {
@@ -532,7 +526,6 @@ create_macos_name_and_version() {
     fi
 
     echo "${macos_name} ${macos_version}"
-    return 0
 }
 
 # ----------------------------------------------------------------------
@@ -687,7 +680,6 @@ get_example_installer_application_name() {
     done
 
     echo "${example_installer_application_name}"
-    return 0
 }
 
 # ----------------------------------------------------------------------
@@ -734,7 +726,6 @@ get_installer_application_type()
     fi
 
     echo "${installer_application_type}"
-    return 0
 }
 
 get_installer_minimum_macos_version() {
