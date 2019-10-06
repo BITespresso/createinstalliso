@@ -18,7 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 if ! [ -n "${BASH}" ]; then
-    echo "This tool must be run in Bash shell." 1>&2
+    echo "This tool must be run in Bash shell." >&2
     exit 1
 fi
 
@@ -189,12 +189,12 @@ trim() {
 }
 
 echo_warning() {
-    echo -n "WARNING: " 1>&102 102>&-
-    echo "$@" 1>&102 102>&-
+    echo -n "WARNING: " >&102 102>&-
+    echo "$@" >&102 102>&-
 }
 
 echo_error() {
-    echo "$@" 1>&102 102>&-
+    echo "$@" >&102 102>&-
 }
 
 echo_error_usage() {
