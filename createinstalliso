@@ -61,22 +61,22 @@ declare -r -a const_supported_installer_application_display_names=(
 )
 
 declare -r -a const_macos_names=(
-    "Mac OS X Cheetah"      # 10.0 "Cheetah"
-    "Mac OS X Puma"         # 10.1 "Puma"
-    "Mac OS X Jaguar"       # 10.2 "Jaguar"
-    "Mac OS X Panther"      # 10.3 "Panther"
-    "Mac OS X Tiger"        # 10.4 "Tiger"
-    "Mac OS X Leopard"      # 10.5 "Leopard"
-    "Mac OS X Snow Leopard" # 10.6 "Snow Leopard"
-    "Mac OS X Lion"         # 10.7 "Lion"
-    "OS X Mountain Lion"    # 10.8 "Mountain Lion"
-    "OS X Mavericks"        # 10.9 "Mavericks"
-    "OS X Yosemite"         # 10.10 "Yosemite"
-    "OS X El Capitan"       # 10.11 "El Capitan"
-    "macOS Sierra"          # 10.12 "Sierra"
-    "macOS High Sierra"     # 10.13 "High Sierra"
-    "macOS Mojave"          # 10.14 "Mojave"
-    "macOS Catalina"        # 10.15 "Catalina"
+    "Mac OS X Cheetah"      # 10.0
+    "Mac OS X Puma"         # 10.1
+    "Mac OS X Jaguar"       # 10.2
+    "Mac OS X Panther"      # 10.3
+    "Mac OS X Tiger"        # 10.4
+    "Mac OS X Leopard"      # 10.5
+    "Mac OS X Snow Leopard" # 10.6
+    "Mac OS X Lion"         # 10.7
+    "OS X Mountain Lion"    # 10.8
+    "OS X Mavericks"        # 10.9
+    "OS X Yosemite"         # 10.10
+    "OS X El Capitan"       # 10.11
+    "macOS Sierra"          # 10.12
+    "macOS High Sierra"     # 10.13
+    "macOS Mojave"          # 10.14
+    "macOS Catalina"        # 10.15
 )
 
 unset global_tmp_directory
