@@ -824,13 +824,13 @@ create_install_media() {
 }
 
 script_createinstallmedia_canceled_by_sigint() {
-    local -r exit_status="$1"
+    local -r -i exit_status="$1"
 
     [[ "${exit_status}" == "2" ]]
 }
 
 script_createinstallmedia_canceled_by_sigquit() {
-    local -r exit_status="$1"
+    local -r -i exit_status="$1"
 
     [[ "${exit_status}" == "3" ]]
 }
@@ -975,7 +975,7 @@ script_hdiutil_makehybrid_canceled_by_sigint() {
 }
 
 script_hdiutil_makehybrid_canceled_by_sigquit() {
-    local -r exit_status="$1"
+    local -r -i exit_status="$1"
 
     [[ "${exit_status}" == "3" ]]
 }
