@@ -19,7 +19,7 @@
 
 if ! [ -n "${BASH}" ]; then
     echo "This tool must be run in Bash shell." >&2
-    exit 1
+    exit 252
 fi
 
 declare -r const_script_name="createinstalliso"
@@ -84,7 +84,6 @@ unset global_install_esd_mountpoint
 unset global_install_disk_mountpoint
 unset global_install_disk_device_node
 unset global_incomplete_iso_target_image
-declare -i global_exit_with_error_exit_status="1"
 
 # ======================================================================
 # Helper functions
@@ -248,7 +247,7 @@ is_root() {
 # $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_option_including_option_parameter() {
     local -r argument="$1"
@@ -263,7 +262,7 @@ is_option_including_option_parameter() {
 # $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_long_option_including_option_parameter() {
     local -r argument="$1"
@@ -278,7 +277,7 @@ is_long_option_including_option_parameter() {
 # $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_short_option_including_option_parameter() {
     local -r argument="$1"
@@ -293,7 +292,7 @@ is_short_option_including_option_parameter() {
 # $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_long_option() {
     local -r argument="$1"
@@ -309,7 +308,7 @@ is_long_option() {
 # $2 - long option (including leading '-')
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_valid_long_option() {
     local -r argument="$1"
@@ -327,7 +326,7 @@ is_valid_long_option() {
 # $1 - argument as provided on the command line (including leading '-')
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_short_options_combination() {
     local -r argument="$1"
@@ -465,7 +464,7 @@ is_valid_installer_application_path() {
 # $1 - operating system name
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_macos() {
     local -r os_name="$1"
@@ -509,7 +508,7 @@ is_supported_installer_application_display_name() {
 # $2 - name of the array as string
 #
 # Output:
-# none - returns with exit status zero if true
+# none - returns with status zero if true
 # ----------------------------------------------------------------------
 is_array_item() {
     local -r item="$1"
@@ -716,7 +715,7 @@ get_absolute_logical_path() {
 # $1 - prompt to be displayed on the command line
 #
 # Output:
-# none - returns with exit status zero if user gave his consent
+# none - returns with status zero if user gave his consent
 # ----------------------------------------------------------------------
 get_user_consent() {
     local -r prompt="$1"
@@ -1120,7 +1119,7 @@ exit_invalid_option() {
     fi
 
     echo_error_usage
-    exit 255
+    exit_with_status 255
 }
 
 # ----------------------------------------------------------------------
@@ -1140,7 +1139,7 @@ exit_missing_option_parameter_for_option() {
     fi
 
     echo_error_usage
-    exit 255
+    exit_with_status 255
 }
 
 # ----------------------------------------------------------------------
@@ -1156,7 +1155,7 @@ exit_no_option_parameter_allowed_for_long_option(){
     echo_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
 
     echo_error_usage
-    exit 255
+    exit_with_status 255
 }
 
 # ----------------------------------------------------------------------
@@ -1172,24 +1171,21 @@ exit_ambiguous_long_option() {
     echo_error "${const_script_name}: option \`${long_option}' is ambiguous"
 
     echo_error_usage
-    exit 255
+    exit_with_status 255
 }
 
-# ----------------------------------------------------------------------
-# Issues an error message and exits.
-#
-# Input:
-# $@ - optional error message(s)
-# global_exit_with_error_exit_status - if set, used as exit status
-# ----------------------------------------------------------------------
-exit_with_error() {
-    local -r -a error_messages=("$@")
+exit_with_status() {
+    local -r -i exit_status="$1"
+    local -a error_messages
+
+    shift
+    error_messages=("$@")
 
     if (( ${#error_messages[@]} > 0 )); then
         echo_error "${error_messages[@]}"
     fi
 
-    exit "${global_exit_with_error_exit_status:-1}"
+    exit "${exit_status}"
 }
 
 # ======================================================================
@@ -1214,28 +1210,22 @@ main() {
     local -i macos_version_for_compare
     local macos_name_and_version
 
-    os_name="$(get_os_name)" || exit_with_error "Couldn't get operating system name."
+    os_name="$(get_os_name)" || exit_with_status 251 "Couldn't get operating system name."
+    is_macos "${os_name}" || exit_with_status 250 "This tool must be run on macOS."
 
-    if ! is_macos "${os_name}"; then
-        echo_error "This tool must be run on macOS."
-        exit 1
-    fi
-
-    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" || exit_with_error "Couldn't get macOS version."
-    IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_error "Couldn't get macOS version."
+    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" && IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_status 248 "Couldn't get macOS version."
     macos_major_version="${macos_version[0]:-0}"
     macos_minor_version="${macos_version[1]:-0}"
     macos_patch_version="${macos_version[2]:-0}"
     (( macos_version_for_compare = (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))
 
     if is_unsupported_macos_minor_version "${macos_minor_version}"; then
-        macos_name_and_version="$(create_macos_name_and_version "${const_supported_macos_minor_versions[0]}")" || exit_with_error "Invalid macOS version."
-        echo_error "This tool requires ${macos_name_and_version} or later."
-        exit 1
+        macos_name_and_version="$(create_macos_name_and_version "${const_supported_macos_minor_versions[0]}")" || exit_with_status 247 "Invalid macOS version."
+        exit_with_status 246 "This tool requires ${macos_name_and_version} or later."
     fi
 
     if ! is_supported_macos_minor_version "${macos_minor_version}"; then
-        macos_name_and_version="$(create_macos_name_and_version "${macos_minor_version}" "${macos_patch_version}")" || exit_with_error "Invalid macOS version."
+        macos_name_and_version="$(create_macos_name_and_version "${macos_minor_version}" "${macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
         echo_warning "This tool has not been tested on ${macos_name_and_version}."
     fi
 
@@ -1260,13 +1250,10 @@ main() {
     # installer USB flash drive or other volume.
     if (( $# < 4 )); then
         echo_error_usage
-        exit 0
+        exit_with_status 0
     fi
 
-    if ! is_root; then
-        echo_error "This tool must be run as root."
-        exit 249
-    fi
+    is_root || exit_with_status 249 "This tool must be run as root."
 
     while [[ "${1+set}" == "set" ]]; do
         case "$1" in
@@ -1367,18 +1354,15 @@ main() {
     # ==================================================================
 
     if [[ "${option_applicationpath+set}" != "set" || "${option_targetdirectory+set}" != "set" ]]; then
-        echo_error "You must specify both the target directory and install application path."
-        exit 255
+        exit_with_status 255 "You must specify both the target directory and install application path."
     fi
 
     if ! is_valid_target_directory_path "${option_targetdirectory}"; then
-        echo_error "${option_targetdirectory} is not a valid target directory."
-        exit 254
+        exit_with_status 254 "${option_targetdirectory} is not a valid target directory."
     fi
 
     if ! is_valid_installer_application_path "${option_applicationpath}"; then
-        echo_error "${option_applicationpath} does not appear to be a valid OS installer application."
-        exit 253
+        exit_with_status 253 "${option_applicationpath} does not appear to be a valid OS installer application."
     fi
 
     # ==================================================================
@@ -1392,14 +1376,14 @@ main() {
     local iso_target_image
     local random_string
 
-    installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_error "Couldn't get absolute path for ${option_applicationpath}."
-    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_error "Couldn't get absolute path for ${option_targetdirectory}."
+    installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 245 "Couldn't get absolute path for ${option_applicationpath}."
+    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_status 244 "Couldn't get absolute path for ${option_targetdirectory}."
 
-    installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_error "Couldn't get installer application display name."
-    installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_error "Couldn't get installer application type."
+    installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 243 "Couldn't get installer application display name."
+    installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application type."
     iso_target_image="${target_directory_path}/${installer_application_display_name}.iso"
 
-    global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_error "Failed to create temporary directory."
+    global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_status 241 "Failed to create temporary directory."
     random_string="${global_tmp_directory##*.}"
 
     # ==================================================================
@@ -1418,17 +1402,15 @@ main() {
     fi
 
     if [[ "${installer_application_type}" == "3" ]]; then
-        installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" || exit_with_error "Couldn't get minimum macOS version for installer application."
-        IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_error "Couldn't get minimum macOS version for installer application."
+        installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_status 240 "Couldn't get minimum macOS version for installer application."
         installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
         installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-0}"
         installer_minimum_macos_patch_version="${installer_minimum_macos_version[2]:-0}"
         (( installer_minimum_macos_version_for_compare = (installer_minimum_macos_major_version * 10000) + (installer_minimum_macos_minor_version * 100) + installer_minimum_macos_patch_version ))
 
         if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
-            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_error "Invalid macOS version."
-            echo_error "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
-            exit 1
+            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
+            exit_with_status 239 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
         fi
     fi
 
@@ -1449,16 +1431,12 @@ main() {
             echo "To continue we need to delete the ${type_of_existing_target} ${iso_target_image}."
             if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
                 echo "Operation canceled."
-                exit 0
+                exit_with_status 0
             fi
         fi
 
-        rm -rf "${iso_target_image}" >/dev/null || exit_with_error "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
+        rm -rf "${iso_target_image}" >/dev/null || exit_with_status 238 "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
     fi
-
-    # Once the script has reached this point of execution, it will
-    # return with exit status 250 in case of an error.
-    global_exit_with_error_exit_status="250"
 
     # ==================================================================
     # Create source image for ISO image
@@ -1489,35 +1467,35 @@ main() {
             install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
             install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
             global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
-            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_error "Mount of outer dmg failed."
+            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 237 "Mount of outer dmg failed."
 
             base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
-            is_file "${base_system_image}" || exit_with_error "BaseSystem missing from the outer dmg, damaged installer image?"
+            is_file "${base_system_image}" || exit_with_status 236 "BaseSystem missing from the outer dmg, damaged installer image?"
 
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
             global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
 
             echo "Creating disk image from installer image..."
-            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap >/dev/null || exit_with_error "Failed to convert BaseSystem.dmg."
-            hdiutil resize -size 16g "${install_disk_image}" >/dev/null || exit_with_error "Failed to resize disk image."
-            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_error "The disk image did not mount."
+            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap >/dev/null || exit_with_status 235 "Failed to convert BaseSystem.dmg."
+            hdiutil resize -size 16g "${install_disk_image}" >/dev/null || exit_with_status 234 "Failed to resize disk image."
+            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 233 "The disk image did not mount."
 
             echo "Copying installer files to disk image..."
-            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" >/dev/null || exit_with_error "Failed to delete Packages symlink."
-            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" >/dev/null || exit_with_error "Failed to copy Packages directory."
+            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" >/dev/null || exit_with_status 232 "Failed to delete Packages symlink."
+            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" >/dev/null || exit_with_status 231 "Failed to copy Packages directory."
 
             echo "Making disk image bootable..."
             core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
-            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_error "The bless of the installer disk image failed."
+            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_status 230 "The bless of the installer disk image failed."
 
             echo "Copying installer image..."
-            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_error "Failed to copy BaseSystem.dmg."
-            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_error "Failed to copy BaseSystem.chunklist."
+            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 229 "Failed to copy BaseSystem.dmg."
+            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 228 "Failed to copy BaseSystem.chunklist."
 
-            hdiutil detach "${global_install_esd_mountpoint}" -force >/dev/null || exit_with_error "Couldn't unmount disk image."
+            hdiutil detach "${global_install_esd_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
             unset global_install_esd_mountpoint
 
-            hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_error "Couldn't unmount disk image."
+            hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
             unset global_install_disk_mountpoint
 
             iso_source_image="${install_disk_image}"
@@ -1531,12 +1509,12 @@ main() {
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
             install_disk_volname="InstallMedia.${random_string}"
-            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_error "Failed to create disk image."
-            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_error "The disk image did not mount."
+            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_status 226 "Failed to create disk image."
+            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_status 233 "The disk image did not mount."
 
-            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_error "Failed to convert disk image to bootable install media."
+            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 225 "Failed to convert disk image to bootable install media."
 
-            hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_error "Couldn't unmount disk image."
+            hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
             unset global_install_disk_device_node
 
             iso_source_image="${install_disk_image}"
@@ -1549,11 +1527,11 @@ main() {
     # ==================================================================
 
     global_incomplete_iso_target_image="${iso_target_image}"
-    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_error "Failed to create ISO image."
+    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 224 "Failed to create ISO image."
     unset global_incomplete_iso_target_image
 
     echo "Install ISO image now available at \"${target_directory_path}/\""
-    exit 0
+    exit_with_status 0
 }
 
 { main "$@"; } 102>&2 2>/dev/null
