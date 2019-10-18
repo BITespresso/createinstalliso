@@ -23,7 +23,7 @@ if ! [ -n "${BASH}" ]; then
 fi
 
 declare -r const_script_name="createinstalliso"
-declare -r -i const_root_uid="0"
+declare -r -i const_root_uid=0
 
 # This script requires /usr/libexec/PlistBuddy to read values from
 # property list files. PlistBuddy is available on Mac OS X 10.5 Leopard
@@ -345,7 +345,7 @@ is_valid_target_directory_path() {
 is_valid_installer_application_path() {
     local -r installer_application_path="$1"
     local installer_application_display_name=""
-    local -i installer_application_type="0"
+    local -i installer_application_type=0
 
     local installer_application_short_version_string
     local valid_installer_application_short_version_string_regex='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
@@ -772,18 +772,18 @@ get_example_installer_application_name() {
 get_installer_application_type()
 {
     local -r installer_application_path="$1"
-    local -i installer_application_type="0"
+    local -i installer_application_type=0
 
     is_not_empty "${installer_application_path}" || return 1
 
     if is_file "${installer_application_path}/Contents/Resources/createinstallmedia"; then
         if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
-            installer_application_type="3"
+            installer_application_type=3
         else
-            installer_application_type="2"
+            installer_application_type=2
         fi
     else
-        installer_application_type="1"
+        installer_application_type=1
     fi
 
     echo "${installer_application_type}"
@@ -826,13 +826,13 @@ create_install_media() {
 script_createinstallmedia_canceled_by_sigint() {
     local -r -i exit_status="$1"
 
-    [[ "${exit_status}" == "2" ]]
+    [[ "${exit_status}" == 2 ]]
 }
 
 script_createinstallmedia_canceled_by_sigquit() {
     local -r -i exit_status="$1"
 
-    [[ "${exit_status}" == "3" ]]
+    [[ "${exit_status}" == 3 ]]
 }
 
 parse_create_install_media() {
@@ -977,7 +977,7 @@ script_hdiutil_makehybrid_canceled_by_sigint() {
 script_hdiutil_makehybrid_canceled_by_sigquit() {
     local -r -i exit_status="$1"
 
-    [[ "${exit_status}" == "3" ]]
+    [[ "${exit_status}" == 3 ]]
 }
 
 parse_create_iso_image() {
@@ -1011,12 +1011,12 @@ parse_create_iso_image() {
     local is_progress_line="false"
     local -r shell_columns="$(tput cols)"
     local -r -i dot_count_max="$(( shell_columns - 2 ))"
-    local -i dot_count="0"
+    local -i dot_count=0
     local -i dot_increment
     local -i percent
     local -i percent_step
-    local -i -r -a percent_steps=("20" "40" "60" "80" "100")
-    local -i last_percent="0"
+    local -i -r -a percent_steps=(20 40 60 80 100)
+    local -i last_percent=0
 
     while IFS= read -r -n1 -d "" char; do
         if [[ (("${is_line_mute}" == "true") && ("${char}" != $'\n')) || ("${is_mute}" == "true") ]]; then
@@ -1083,7 +1083,7 @@ parse_create_iso_image() {
                                 if (( (last_percent < percent_step) && (percent >= percent_step) )); then
                                     echo -n " ${percent_step}%"
 
-                                    if [[ "${percent_step}" != "100" ]]; then
+                                    if [[ "${percent_step}" != 100 ]]; then
                                         echo -n "..."
                                     fi
                                 fi
@@ -1401,7 +1401,7 @@ main() {
         echo_warning "${installer_application_display_name} is not a supported installer."
     fi
 
-    if [[ "${installer_application_type}" == "3" ]]; then
+    if [[ "${installer_application_type}" == 3 ]]; then
         installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_status 240 "Couldn't get minimum macOS version for installer application."
         installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
         installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-0}"
