@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-if ! [ -n "${BASH}" ]; then
+if [ -z "${BASH}" ]; then
     echo "This tool must be run in Bash shell." >&2
     exit 252
 fi
