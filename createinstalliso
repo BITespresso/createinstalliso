@@ -266,7 +266,7 @@ echo_error_usage() {
     echo_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
     echo_error "--nointeraction, Delete an existing ISO image without prompting for confirmation."
     echo_error
-    echo_error "Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath \"/Applications/$(get_example_installer_application_name)\""
+    echo_error "Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
 
     if ! is_root; then
         echo_error
@@ -907,7 +907,7 @@ get_user_consent() {
 ## @brief      Creates an example for an installer application name for
 ##             output to the user (e.g. 'Install macOS Sierra.app').
 ##
-get_example_installer_application_name() {
+create_example_installer_application_name() {
     local -r -i number_of_elements="${#const_supported_installer_application_display_names[@]}"
     local example_installer_application_name="${const_supported_installer_application_display_names[${number_of_elements}-1]}.app"
     local -i i
