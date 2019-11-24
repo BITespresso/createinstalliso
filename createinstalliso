@@ -1361,7 +1361,7 @@ parse_create_iso_image() {
 }
 
 ##
-## @brief      Issues an error message about an invalid option and
+## @brief      Prints an error message about an invalid option and
 ##             exits.
 ##
 ## @param      $1    The option as provided on the command line
@@ -1381,7 +1381,7 @@ exit_invalid_option() {
 }
 
 ##
-## @brief      Issues an error message about a missing option parameter
+## @brief      Prints an error message about a missing option parameter
 ##             for an option and exits.
 ##
 ## @param      $1    The option as provided on the command line
@@ -1401,7 +1401,7 @@ exit_missing_option_parameter_for_option() {
 }
 
 ##
-## @brief      Issues an error message about specifying an option
+## @brief      Prints an error message about specifying an option
 ##             parameter for a long option where no parameter is allowed
 ##             and exits.
 ##
@@ -1418,7 +1418,7 @@ exit_no_option_parameter_allowed_for_long_option(){
 }
 
 ##
-## @brief      Issues an error message about an ambiguous specification
+## @brief      Prints an error message about an ambiguous specification
 ##             for a long option and exits.
 ##
 ## @param      $1    The long option as provided on the command line
