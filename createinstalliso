@@ -235,7 +235,7 @@ trim() {
 ##
 ## @param      $@    The message text(s).
 ##
-echo_warning() {
+print_warning() {
     # The file descriptor for stderr is '102', because in this script
     # '2' is redirected to '/dev/null' to suppress unwanted output to
     # stderr.
@@ -248,7 +248,7 @@ echo_warning() {
 ##
 ## @param      $@    The message text(s).
 ##
-echo_error() {
+print_error() {
     # The file descriptor for stderr is '102', because in this script
     # '2' is redirected to '/dev/null' to suppress unwanted output to
     # stderr.
@@ -258,19 +258,19 @@ echo_error() {
 ##
 ## @brief      Prints the usage information.
 ##
-echo_error_usage() {
-    echo_error "Usage: ${const_script_name} --targetdirectory <path to target directory> --applicationpath <path to OS installer application> [--nointeraction]"
-    echo_error
-    echo_error "Arguments"
-    echo_error "--targetdirectory, A path to a directory where the installer ISO image will be created."
-    echo_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
-    echo_error "--nointeraction, Delete an existing ISO image without prompting for confirmation."
-    echo_error
-    echo_error "Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
+print_error_usage() {
+    print_error "Usage: ${const_script_name} --targetdirectory <path to target directory> --applicationpath <path to OS installer application> [--nointeraction]"
+    print_error
+    print_error "Arguments"
+    print_error "--targetdirectory, A path to a directory where the installer ISO image will be created."
+    print_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
+    print_error "--nointeraction, Delete an existing ISO image without prompting for confirmation."
+    print_error
+    print_error "Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
 
     if ! is_root; then
-        echo_error
-        echo_error "This tool must be run as root."
+        print_error
+        print_error "This tool must be run as root."
     fi
 }
 
@@ -1371,12 +1371,12 @@ exit_invalid_option() {
     local -r option="$1"
 
     if is_long_option "${option}"; then
-        echo_error "${const_script_name}: unrecognized option \`${option}'"
+        print_error "${const_script_name}: unrecognized option \`${option}'"
     else
-        echo_error "${const_script_name}: invalid option -- ${option:1}"
+        print_error "${const_script_name}: invalid option -- ${option:1}"
     fi
 
-    echo_error_usage
+    print_error_usage
     exit_with_status 255
 }
 
@@ -1391,12 +1391,12 @@ exit_missing_option_parameter_for_option() {
     local -r option="$1"
 
     if is_long_option "${option}"; then
-        echo_error "${const_script_name}: option \`${option}' requires an argument"
+        print_error "${const_script_name}: option \`${option}' requires an argument"
     else
-        echo_error "${const_script_name}: option requires an argument -- ${option:1}"
+        print_error "${const_script_name}: option requires an argument -- ${option:1}"
     fi
 
-    echo_error_usage
+    print_error_usage
     exit_with_status 255
 }
 
@@ -1411,9 +1411,9 @@ exit_missing_option_parameter_for_option() {
 exit_no_option_parameter_allowed_for_long_option(){
     local -r long_option="$1"
 
-    echo_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
+    print_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
 
-    echo_error_usage
+    print_error_usage
     exit_with_status 255
 }
 
@@ -1427,9 +1427,9 @@ exit_no_option_parameter_allowed_for_long_option(){
 exit_ambiguous_long_option() {
     local -r long_option="$1"
 
-    echo_error "${const_script_name}: option \`${long_option}' is ambiguous"
+    print_error "${const_script_name}: option \`${long_option}' is ambiguous"
 
-    echo_error_usage
+    print_error_usage
     exit_with_status 255
 }
 
@@ -1448,7 +1448,7 @@ exit_with_status() {
     error_messages=("$@")
 
     if (( ${#error_messages[@]} > 0 )); then
-        echo_error "${error_messages[@]}"
+        print_error "${error_messages[@]}"
     fi
 
     exit "${exit_status}"
@@ -1492,7 +1492,7 @@ main() {
 
     if ! is_supported_macos_minor_version "${macos_minor_version}"; then
         macos_name_and_version="$(create_macos_name_and_version "${macos_minor_version}" "${macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
-        echo_warning "This tool has not been tested on ${macos_name_and_version}."
+        print_warning "This tool has not been tested on ${macos_name_and_version}."
     fi
 
     # ==================================================================
@@ -1515,7 +1515,7 @@ main() {
     # Apple's command 'createinstallmedia' for creation of a bootable
     # installer USB flash drive or other volume.
     if (( $# < 4 )); then
-        echo_error_usage
+        print_error_usage
         exit_with_status 0
     fi
 
@@ -1664,7 +1664,7 @@ main() {
     local -i installer_minimum_macos_version_for_compare
 
     if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
-        echo_warning "${installer_application_display_name} is not a supported installer."
+        print_warning "${installer_application_display_name} is not a supported installer."
     fi
 
     if [[ "${installer_application_type}" == 3 ]]; then
