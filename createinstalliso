@@ -770,7 +770,7 @@ detach_for_cleanup() {
 }
 
 ##
-## @brief      Exits the script with the specified exit status and an
+## @brief      Exits the script with the specified exit status and
 ##             prints optional error message(s).
 ##
 ## @param      $1    The exit status.
