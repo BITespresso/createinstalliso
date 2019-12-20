@@ -171,11 +171,13 @@ main() {
                     else
                         option_parameter="${1#-?}"
                     fi
+
                     shift
                 else
                     if is_long_option "$1"; then
                         is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
                     fi
+
                     [[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
                     option_parameter="$2"
                     shift 2
@@ -195,11 +197,13 @@ main() {
                     else
                         option_parameter="${1#-?}"
                     fi
+
                     shift
                 else
                     if is_long_option "$1"; then
                         is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
                     fi
+
                     [[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
                     option_parameter="$2"
                     shift 2
@@ -328,6 +332,7 @@ main() {
         else
             type_of_existing_target="directory"
         fi
+
         if [[ ! "${option_nointeraction}" == "true" ]]; then
             echo "Ready to start."
             echo "To continue we need to delete the ${type_of_existing_target} ${iso_target_image}."
@@ -584,6 +589,7 @@ get_absolute_logical_path() {
             echo "$(pwd -L)/${file_or_directory}"
         fi
     fi
+
     return 0
 }
 
