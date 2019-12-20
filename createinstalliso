@@ -22,6 +22,10 @@ if [ -z "${BASH}" ]; then
     exit 252
 fi
 
+# ======================================================================
+# Global variables
+# ======================================================================
+
 declare -r const_script_name="createinstalliso"
 declare -r -i const_root_uid=0
 
@@ -87,7 +91,581 @@ unset global_install_disk_device_node
 unset global_incomplete_iso_target_image
 
 # ======================================================================
-# Helper functions
+# Main function
+# ======================================================================
+
+main() {
+    set_shell_options
+    set_traps
+
+    # ------------------------------------------------------------------
+    # Check operating system requirements
+    # ------------------------------------------------------------------
+
+    local os_name
+
+    local macos_version_string
+    local -i -a macos_version
+    local -i macos_major_version
+    local -i macos_minor_version
+    local -i macos_patch_version
+    local -i macos_version_for_compare
+    local macos_name_and_version
+
+    os_name="$(get_os_name)" || exit_with_status 251 "Couldn't get operating system name."
+    is_macos "${os_name}" || exit_with_status 250 "This tool must be run on macOS."
+
+    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" && IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_status 248 "Couldn't get macOS version."
+    macos_major_version="${macos_version[0]:-0}"
+    macos_minor_version="${macos_version[1]:-0}"
+    macos_patch_version="${macos_version[2]:-0}"
+    (( macos_version_for_compare = (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))
+
+    if is_unsupported_macos_minor_version "${macos_minor_version}"; then
+        macos_name_and_version="$(create_macos_name_and_version "${const_supported_macos_minor_versions[0]}")" || exit_with_status 247 "Invalid macOS version."
+        exit_with_status 246 "This tool requires ${macos_name_and_version} or later."
+    fi
+
+    if ! is_supported_macos_minor_version "${macos_minor_version}"; then
+        macos_name_and_version="$(create_macos_name_and_version "${macos_minor_version}" "${macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
+        print_warning "This tool has not been tested on ${macos_name_and_version}."
+    fi
+
+    # ------------------------------------------------------------------
+    # Handle command line arguments
+    # ------------------------------------------------------------------
+
+    unset option_applicationpath
+    unset option_targetdirectory
+    local option_nointeraction="false"
+
+    local long_option
+    local option_parameter
+
+    # This script requires at least four arguments: Two options with one
+    # option parameter each. However, this does not take into account
+    # that one argument might already consist of an option and its
+    # option parameter.
+    #
+    # NOTE: This behavior is intended to replicate the behavior of
+    # Apple's command 'createinstallmedia' for creation of a bootable
+    # installer USB flash drive or other volume.
+    if (( $# < 4 )); then
+        print_error_usage
+        exit_with_status 0
+    fi
+
+    is_root || exit_with_status 249 "This tool must be run as root."
+
+    while [[ "${1+set}" == "set" ]]; do
+        case "$1" in
+
+            # Option '--applicationpath'
+            -a* | --a* )
+                long_option="--applicationpath"
+
+                if is_option_including_option_parameter "$1"; then
+                    if is_long_option "$1"; then
+                        is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+                        option_parameter="${1#--*=}"
+                    else
+                        option_parameter="${1#-?}"
+                    fi
+                    shift
+                else
+                    if is_long_option "$1"; then
+                        is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
+                    fi
+                    [[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
+                    option_parameter="$2"
+                    shift 2
+                fi
+
+                option_applicationpath="${option_parameter}"
+                ;;
+
+            # Option '--targetdirectory'
+            -t* | --t* )
+                long_option="--targetdirectory"
+
+                if is_option_including_option_parameter "$1"; then
+                    if is_long_option "$1"; then
+                        is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+                        option_parameter="${1#--*=}"
+                    else
+                        option_parameter="${1#-?}"
+                    fi
+                    shift
+                else
+                    if is_long_option "$1"; then
+                        is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
+                    fi
+                    [[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
+                    option_parameter="$2"
+                    shift 2
+                fi
+
+                option_targetdirectory="${option_parameter}"
+                ;;
+
+            # Option '--nointeraction'
+            -n* | --n* )
+                long_option="--nointeraction"
+
+                if is_long_option_including_option_parameter "$1"; then
+                    is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
+                    exit_no_option_parameter_allowed_for_long_option "${1%%=*}"
+                elif is_long_option "$1"; then
+                    is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
+                    shift
+                elif is_short_options_combination "$1"; then
+                    set -- "-${1:2}" "${@:2}"
+                else
+                    shift
+                fi
+
+                option_nointeraction="true"
+                ;;
+
+            # End of options
+            -- )
+                shift
+                break
+                ;;
+
+            # Ambiguous long option
+            --=* )
+                exit_ambiguous_long_option "${1%%=*}"
+                ;;
+
+            # Invalid short or long option
+            -[^-]* | --?* )
+                exit_invalid_option "$1"
+                ;;
+
+            # Non-option argument or single '-'
+            * )
+                shift
+                ;;
+
+        esac
+    done
+
+    # ------------------------------------------------------------------
+    # Verify command line options
+    # ------------------------------------------------------------------
+
+    if [[ "${option_applicationpath+set}" != "set" || "${option_targetdirectory+set}" != "set" ]]; then
+        exit_with_status 255 "You must specify both the target directory and install application path."
+    fi
+
+    if ! is_valid_target_directory_path "${option_targetdirectory}"; then
+        exit_with_status 254 "${option_targetdirectory} is not a valid target directory."
+    fi
+
+    if ! is_valid_installer_application_path "${option_applicationpath}"; then
+        exit_with_status 253 "${option_applicationpath} does not appear to be a valid OS installer application."
+    fi
+
+    # ------------------------------------------------------------------
+    # Initialization
+    # ------------------------------------------------------------------
+
+    local installer_application_path
+    local target_directory_path
+    local installer_application_display_name
+    local -i installer_application_type
+    local iso_target_image
+    local random_string
+
+    installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 245 "Couldn't get absolute path for ${option_applicationpath}."
+    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_status 244 "Couldn't get absolute path for ${option_targetdirectory}."
+
+    installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 243 "Couldn't get installer application display name."
+    installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application type."
+    iso_target_image="${target_directory_path}/${installer_application_display_name}.iso"
+
+    global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_status 241 "Failed to create temporary directory."
+    random_string="${global_tmp_directory##*.}"
+
+    # ------------------------------------------------------------------
+    # Check installer application requirements
+    # ------------------------------------------------------------------
+
+    local installer_minimum_macos_version_string
+    local -i -a installer_minimum_macos_version
+    local -i installer_minimum_macos_major_version
+    local -i installer_minimum_macos_minor_version
+    local -i installer_minimum_macos_patch_version
+    local -i installer_minimum_macos_version_for_compare
+
+    if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
+        print_warning "${installer_application_display_name} is not a supported installer."
+    fi
+
+    if [[ "${installer_application_type}" == 3 ]]; then
+        installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_status 240 "Couldn't get minimum macOS version for installer application."
+        installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
+        installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-0}"
+        installer_minimum_macos_patch_version="${installer_minimum_macos_version[2]:-0}"
+        (( installer_minimum_macos_version_for_compare = (installer_minimum_macos_major_version * 10000) + (installer_minimum_macos_minor_version * 100) + installer_minimum_macos_patch_version ))
+
+        if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
+            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
+            exit_with_status 239 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
+        fi
+    fi
+
+    # ------------------------------------------------------------------
+    # Perform required user interactions
+    # ------------------------------------------------------------------
+
+    local type_of_existing_target
+
+    if is_existing "${iso_target_image}"; then
+        if is_file "${iso_target_image}"; then
+            type_of_existing_target="file"
+        else
+            type_of_existing_target="directory"
+        fi
+        if [[ ! "${option_nointeraction}" == "true" ]]; then
+            echo "Ready to start."
+            echo "To continue we need to delete the ${type_of_existing_target} ${iso_target_image}."
+            if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
+                echo "Operation canceled."
+                exit_with_status 0
+            fi
+        fi
+
+        rm -rf "${iso_target_image}" >/dev/null || exit_with_status 238 "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
+    fi
+
+    # ------------------------------------------------------------------
+    # Create source image for ISO image
+    # ------------------------------------------------------------------
+
+    local iso_source_image
+    local install_esd_image
+    local install_esd_shadow
+    local base_system_image
+    local install_disk_image
+    local install_disk_volname
+    local core_services_directory
+
+    case "${installer_application_type}" in
+
+        # Installer application type '1' for:
+        # - Mac OS X Lion 10.7
+        # - OS X Mountain Lion 10.8
+        1 )
+            iso_source_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+            ;;
+
+        # Installer application type '2' for:
+        # - OS X Mavericks 10.9
+        # - OS X Yosemite 10.10
+        # - OS X El Capitan 10.11
+        2 )
+            install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
+            install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
+            global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
+            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 237 "Mount of outer dmg failed."
+
+            base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
+            is_file "${base_system_image}" || exit_with_status 236 "BaseSystem missing from the outer dmg, damaged installer image?"
+
+            install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
+            global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
+
+            echo "Creating disk image from installer image..."
+            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap >/dev/null || exit_with_status 235 "Failed to convert BaseSystem.dmg."
+            hdiutil resize -size 16g "${install_disk_image}" >/dev/null || exit_with_status 234 "Failed to resize disk image."
+            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 233 "The disk image did not mount."
+
+            echo "Copying installer files to disk image..."
+            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" >/dev/null || exit_with_status 232 "Failed to delete Packages symlink."
+            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" >/dev/null || exit_with_status 231 "Failed to copy Packages directory."
+
+            echo "Making disk image bootable..."
+            core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
+            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_status 230 "The bless of the installer disk image failed."
+
+            echo "Copying installer image..."
+            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 229 "Failed to copy BaseSystem.dmg."
+            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 228 "Failed to copy BaseSystem.chunklist."
+
+            hdiutil detach "${global_install_esd_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
+            unset global_install_esd_mountpoint
+
+            hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
+            unset global_install_disk_mountpoint
+
+            iso_source_image="${install_disk_image}"
+            ;;
+
+        # Installer application type '3' for:
+        # - macOS Sierra 10.12
+        # - macOS High Sierra 10.13
+        # - macOS Mojave 10.14
+        3 )
+            echo "Creating empty disk image..."
+            install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
+            install_disk_volname="InstallMedia.${random_string}"
+            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_status 226 "Failed to create disk image."
+            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_status 233 "The disk image did not mount."
+
+            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 225 "Failed to convert disk image to bootable install media."
+
+            hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
+            unset global_install_disk_device_node
+
+            iso_source_image="${install_disk_image}"
+            ;;
+
+    esac
+
+    # ------------------------------------------------------------------
+    # Create ISO image
+    # ------------------------------------------------------------------
+
+    global_incomplete_iso_target_image="${iso_target_image}"
+    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 224 "Failed to create ISO image."
+    unset global_incomplete_iso_target_image
+
+    echo "Install ISO image now available at \"${target_directory_path}/\""
+    exit_with_status 0
+}
+
+# ======================================================================
+# Utility functions
+# ======================================================================
+
+##
+## @brief      Gets the name of the current operating system.
+##
+## @return     The operating system name.
+##
+get_os_name() {
+    local os_name
+
+    os_name="$(uname -s 2>/dev/null)" || return 1
+
+    echo "${os_name}"
+}
+
+##
+## @brief      Determines whether an operating system is macOS.
+##
+## @param      $1       A name of an operating system as output by
+##                      `uname -s`.
+##
+## @retval     `true`   The operating system is macOS.
+## @retval     `false`  Otherwise.
+##
+is_macos() {
+    local -r os_name="$1"
+
+    is_not_empty "${os_name}" || return 1
+
+    [[ "${os_name}" == "Darwin" ]]
+}
+
+##
+## @brief      Determines whether the current user is root.
+##
+## @retval     `true`   The user is root.
+## @retval     `false`  Otherwise.
+##
+is_root() {
+    [[ "$(id -u)" -eq "${const_root_uid}" ]]
+}
+
+##
+## @brief      Determines whether the specified file is existing.
+##
+## @param      $1       The file to be checked.
+##
+## @retval     `true`   The file exists.
+## @retval     `false`  Otherwise.
+##
+is_existing() {
+    local -r file_or_directory="$1"
+
+    [[ -e "${file_or_directory}" ]]
+}
+
+##
+## @brief      Determines whether the specified file is a regular file.
+##
+## @param      $1       The file to be checked.
+##
+## @retval     `true`   The file exists and is a regular file.
+## @retval     `false`  Otherwise.
+##
+is_file() {
+    local -r file_or_directory="$1"
+
+    [[ -f "${file_or_directory}" ]]
+}
+
+##
+## @brief      Determines whether the specified file is a directory.
+##
+## @param      $1       The file to be checked.
+##
+## @retval     `true`   The file exists and is a directory.
+## @retval     `false`  Otherwise.
+##
+is_directory() {
+    local -r file_or_directory="$1"
+
+    [[ -d "${file_or_directory}" ]]
+}
+
+##
+## @brief      Determines whether the specified string is not empty.
+##
+## @param      $1       The string to be checked.
+##
+## @retval     `true`   The length of string is non-zero.
+## @retval     `false`  Otherwise.
+##
+is_not_empty() {
+    local -r string="$1"
+
+    [[ -n "${string}" ]]
+}
+
+##
+## @brief      Determines whether an item is contained in an array. The
+##             array is passed to the function by reference via its
+##             name.
+##
+## @param      $1       An item.
+## @param      $2       The name of the array as string.
+##
+## @retval     `true`   The item is contained in the array.
+## @retval     `false`  Otherwise.
+##
+is_array_item() {
+    local -r item="$1"
+    local -r array_name="$2[@]"
+    local current_item
+
+    for current_item in "${!array_name}"; do
+        if [[ "${current_item}" == "${item}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+##
+## @brief      Gets the absolute logical path to a file or directory.
+##
+## @param      $1    An absolute or relative path to a file or
+##                   directory.
+##
+## @return     The absolute logical (i.e. not the physical) path to the
+##             file or directory.
+##
+get_absolute_logical_path() {
+    local -r file_or_directory="$1"
+
+    is_not_empty "${file_or_directory}" || return 1
+    is_existing "${file_or_directory}" || return 1
+
+    if is_directory "${file_or_directory}"; then
+        echo "$(cd "${file_or_directory}"; pwd -L)"
+    else
+        if [[ "${file_or_directory}" == */* ]]; then
+            echo "$(cd "${file_or_directory%/*}"; pwd -L)/${file_or_directory##*/}"
+        else
+            echo "$(pwd -L)/${file_or_directory}"
+        fi
+    fi
+    return 0
+}
+
+##
+## @brief      Asks the user for consent on the command line. Any user
+##             input starting with 'y' or 'Y' will be treated as
+##             consent.
+##
+## @param      $1       A prompt to be displayed on the command line.
+##
+## @retval     `true`   The user gave his consent.
+## @retval     `false`  Otherwise.
+##
+get_user_consent() {
+    local -r prompt="$1"
+    local input
+    local -r yes_regex='^[yY].*$'
+
+    echo -n "${prompt}"
+    IFS= read -r input
+
+    [[ "${input}" =~ ${yes_regex} ]]
+}
+
+##
+## @brief      Gets the value of an entry in a property list file.
+##
+## @param      $1    A property list entry name.
+## @param      $2    A property list file.
+##
+## @return     The value of the specified property list entry.
+##
+get_plist_value() {
+    local -r entry="$1"
+    local -r plist_file="$2"
+
+    is_not_empty "${entry}" || return 1
+    is_not_empty "${plist_file}" || return 1
+
+    execute_plist_buddy_command "Print '${entry}'" "${plist_file}"
+}
+
+##
+## @brief      Executes a PlistBuddy command on a property list file.
+##
+## @param      $1    The command to be executed by PlistBuddy.
+## @param      $2    A property list file.
+##
+## @return     The output of PlistBuddy.
+##
+execute_plist_buddy_command() {
+    local -r plist_command="$1"
+    local -r plist_file="$2"
+
+    is_not_empty "${plist_command}" || return 1
+    is_not_empty "${plist_file}" || return 1
+
+    /usr/libexec/PlistBuddy -c "${plist_command}" "${plist_file}" 2>/dev/null
+}
+
+##
+## @brief      Removes all leading and tailing whitespaces from a
+##             string.
+##
+## @param      $1    A string.
+##
+## @return     The trimmed string.
+##
+trim() {
+    local string="$1"
+
+    # Remove leading whitespace
+    string="${string#"${string%%[![:space:]]*}"}"
+
+    # Remove trailing whitespace
+    string="${string%"${string##*[![:space:]]}"}"
+
+    echo -n "${string}"
+}
+
+# ======================================================================
+# Signal and exit handling functions
 # ======================================================================
 
 ##
@@ -161,25 +739,6 @@ signal_handler() {
 }
 
 ##
-## @brief      Kills all processes in the same process group as the
-##             current process with the provided signal.
-##
-## @param      $1    The signal name used for killing the process group
-##                   (e.g. 'SIGINT').
-##
-kill_process_group_with_signal_name() {
-    local -r signal_name="$1"
-    local pgid
-
-    is_not_empty "${signal_name}" || return 1
-
-    pgid="$(ps -o pgid= "$$")"
-    pgid="$(trim "${pgid}")"
-
-    kill -s "${signal_name}" -- -"${pgid}"
-}
-
-##
 ## @brief      Performs the required cleanup of allocated ressources.
 ##
 cleanup() {
@@ -211,24 +770,48 @@ detach_for_cleanup() {
 }
 
 ##
-## @brief      Removes all leading and tailing whitespaces from a
-##             string.
+## @brief      Exits the script with the specified exit status and an
+##             prints optional error message(s).
 ##
-## @param      $1    A string.
+## @param      $1    The exit status.
+## @param      $2    Optional error message text(s).
 ##
-## @return     The trimmed string.
-##
-trim() {
-    local string="$1"
+exit_with_status() {
+    local -r -i exit_status="$1"
+    local -a error_messages
 
-    # Remove leading whitespace
-    string="${string#"${string%%[![:space:]]*}"}"
+    shift
+    error_messages=("$@")
 
-    # Remove trailing whitespace
-    string="${string%"${string##*[![:space:]]}"}"
+    if (( ${#error_messages[@]} > 0 )); then
+        print_error "${error_messages[@]}"
+    fi
 
-    echo -n "${string}"
+    exit "${exit_status}"
 }
+
+##
+## @brief      Kills all processes in the same process group as the
+##             current process with the provided signal.
+##
+## @param      $1    The signal name used for killing the process group
+##                   (e.g. 'SIGINT').
+##
+kill_process_group_with_signal_name() {
+    local -r signal_name="$1"
+    local pgid
+
+    is_not_empty "${signal_name}" || return 1
+
+    pgid="$(ps -o pgid= "$$")"
+    pgid="$(trim "${pgid}")"
+
+    kill -s "${signal_name}" -- -"${pgid}"
+}
+
+# ======================================================================
+# Error and warning message functions
+# ======================================================================
 
 ##
 ## @brief      Prints warning message(s).
@@ -275,70 +858,27 @@ print_error_usage() {
 }
 
 ##
-## @brief      Determines whether the specified string is not empty.
+## @brief      Creates an example for an installer application name for
+##             output to the user (e.g. 'Install macOS Sierra.app').
 ##
-## @param      $1       The string to be checked.
-##
-## @retval     `true`   The length of string is non-zero.
-## @retval     `false`  Otherwise.
-##
-is_not_empty() {
-    local -r string="$1"
+create_example_installer_application_name() {
+    local -r -i number_of_elements="${#const_supported_installer_application_display_names[@]}"
+    local example_installer_application_name="${const_supported_installer_application_display_names[${number_of_elements}-1]}.app"
+    local -i i
 
-    [[ -n "${string}" ]]
+    for (( i = number_of_elements - 1; i >= 0; i-- )); do
+        if is_valid_installer_application_path "/Applications/${const_supported_installer_application_display_names[${i}]}.app"; then
+            example_installer_application_name="${const_supported_installer_application_display_names[${i}]}.app"
+            break
+        fi
+    done
+
+    echo "${example_installer_application_name}"
 }
 
-##
-## @brief      Determines whether the specified file is existing.
-##
-## @param      $1       The file to be checked.
-##
-## @retval     `true`   The file exists.
-## @retval     `false`  Otherwise.
-##
-is_existing() {
-    local -r file_or_directory="$1"
-
-    [[ -e "${file_or_directory}" ]]
-}
-
-##
-## @brief      Determines whether the specified file is a regular file.
-##
-## @param      $1       The file to be checked.
-##
-## @retval     `true`   The file exists and is a regular file.
-## @retval     `false`  Otherwise.
-##
-is_file() {
-    local -r file_or_directory="$1"
-
-    [[ -f "${file_or_directory}" ]]
-}
-
-##
-## @brief      Determines whether the specified file is a directory.
-##
-## @param      $1       The file to be checked.
-##
-## @retval     `true`   The file exists and is a directory.
-## @retval     `false`  Otherwise.
-##
-is_directory() {
-    local -r file_or_directory="$1"
-
-    [[ -d "${file_or_directory}" ]]
-}
-
-##
-## @brief      Determines whether the current user is root.
-##
-## @retval     `true`   The user is root.
-## @retval     `false`  Otherwise.
-##
-is_root() {
-    [[ "$(id -u)" -eq "${const_root_uid}" ]]
-}
+# ======================================================================
+# Command line argument handling functions
+# ======================================================================
 
 ##
 ## @brief      Determines whether an argument is an option including an
@@ -442,6 +982,128 @@ is_short_options_combination() {
     local -r argument="$1"
 
     [[ "${argument}" == -[^-]?* ]]
+}
+
+##
+## @brief      Prints an error message about an invalid option and
+##             exits.
+##
+## @param      $1    The option as provided on the command line
+##                   (including leading '-' or '--').
+##
+exit_invalid_option() {
+    local -r option="$1"
+
+    if is_long_option "${option}"; then
+        print_error "${const_script_name}: unrecognized option \`${option}'"
+    else
+        print_error "${const_script_name}: invalid option -- ${option:1}"
+    fi
+
+    print_error_usage
+    exit_with_status 255
+}
+
+##
+## @brief      Prints an error message about a missing option parameter
+##             for an option and exits.
+##
+## @param      $1    The option as provided on the command line
+##                   (including leading '-' or '--').
+##
+exit_missing_option_parameter_for_option() {
+    local -r option="$1"
+
+    if is_long_option "${option}"; then
+        print_error "${const_script_name}: option \`${option}' requires an argument"
+    else
+        print_error "${const_script_name}: option requires an argument -- ${option:1}"
+    fi
+
+    print_error_usage
+    exit_with_status 255
+}
+
+##
+## @brief      Prints an error message about specifying an option
+##             parameter for a long option where no parameter is allowed
+##             and exits.
+##
+## @param      $1    The long option as provided on the command line
+##                   (including leading '--').
+##
+exit_no_option_parameter_allowed_for_long_option(){
+    local -r long_option="$1"
+
+    print_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
+
+    print_error_usage
+    exit_with_status 255
+}
+
+##
+## @brief      Prints an error message about an ambiguous specification
+##             for a long option and exits.
+##
+## @param      $1    The long option as provided on the command line
+##                   (including leading '--').
+##
+exit_ambiguous_long_option() {
+    local -r long_option="$1"
+
+    print_error "${const_script_name}: option \`${long_option}' is ambiguous"
+
+    print_error_usage
+    exit_with_status 255
+}
+
+# ======================================================================
+# Core functions
+# ======================================================================
+
+##
+## @brief      Determines whether a macOS version is valid.
+##
+## @param      $1       A macOS version as string (e.g. '10.12.2').
+##
+## @retval     `true`   The macOS version is valid.
+## @retval     `false`  Otherwise.
+##
+is_valid_macos_version() {
+    local -r macos_version="$1"
+    local -r valid_macos_version_regex='^10\.[[:digit:]]+(\.[[:digit:]]+)?$'
+
+    [[ "${macos_version}" =~ ${valid_macos_version_regex} ]]
+}
+
+##
+## @brief      Determines whether a macOS version is unsupported. An
+##             unsupported version **will not** work with this script.
+##
+## @param      $1       A macOS version as string (e.g. '10.12.2').
+##
+## @retval     `true`   The macOS version is unsupported.
+## @retval     `false`  Otherwise.
+##
+is_unsupported_macos_minor_version() {
+    local -r macos_minor_version="$1"
+
+    is_array_item "${macos_minor_version}" "const_unsupported_macos_minor_versions"
+}
+
+##
+## @brief      Determines whether a macOS version is supported. A
+##             supported version **will** work with this script.
+##
+## @param      $1       A macOS version as string (e.g. '10.12.2').
+##
+## @retval     `true`   The macOS version is unsupported.
+## @retval     `false`  Otherwise.
+##
+is_supported_macos_minor_version() {
+    local -r macos_minor_version="$1"
+
+    is_array_item "${macos_minor_version}" "const_supported_macos_minor_versions"
 }
 
 ##
@@ -585,68 +1247,6 @@ is_valid_installer_application_path() {
 }
 
 ##
-## @brief      Determines whether an operating system is macOS.
-##
-## @param      $1       A name of an operating system as output by
-##                      `uname -s`.
-##
-## @retval     `true`   The operating system is macOS.
-## @retval     `false`  Otherwise.
-##
-is_macos() {
-    local -r os_name="$1"
-
-    is_not_empty "${os_name}" || return 1
-
-    [[ "${os_name}" == "Darwin" ]]
-}
-
-##
-## @brief      Determines whether a macOS version is valid.
-##
-## @param      $1       A macOS version as string (e.g. '10.12.2').
-##
-## @retval     `true`   The macOS version is valid.
-## @retval     `false`  Otherwise.
-##
-is_valid_macos_version() {
-    local -r macos_version="$1"
-    local -r valid_macos_version_regex='^10\.[[:digit:]]+(\.[[:digit:]]+)?$'
-
-    [[ "${macos_version}" =~ ${valid_macos_version_regex} ]]
-}
-
-##
-## @brief      Determines whether a macOS version is unsupported. An
-##             unsupported version **will not** work with this script.
-##
-## @param      $1       A macOS version as string (e.g. '10.12.2').
-##
-## @retval     `true`   The macOS version is unsupported.
-## @retval     `false`  Otherwise.
-##
-is_unsupported_macos_minor_version() {
-    local -r macos_minor_version="$1"
-
-    is_array_item "${macos_minor_version}" "const_unsupported_macos_minor_versions"
-}
-
-##
-## @brief      Determines whether a macOS version is supported. A
-##             supported version **will** work with this script.
-##
-## @param      $1       A macOS version as string (e.g. '10.12.2').
-##
-## @retval     `true`   The macOS version is unsupported.
-## @retval     `false`  Otherwise.
-##
-is_supported_macos_minor_version() {
-    local -r macos_minor_version="$1"
-
-    is_array_item "${macos_minor_version}" "const_supported_macos_minor_versions"
-}
-
-##
 ## @brief      Determines whether an installer application display name
 ##             is supported. A macOS installer application with a
 ##             supported application display name can be used to create
@@ -666,131 +1266,6 @@ is_supported_installer_application_display_name() {
 }
 
 ##
-## @brief      Determines whether an item is contained in an array. The
-##             array is passed to the function by reference via its
-##             name.
-##
-## @param      $1       An item.
-## @param      $2       The name of the array as string.
-##
-## @retval     `true`   The item is contained in the array.
-## @retval     `false`  Otherwise.
-##
-is_array_item() {
-    local -r item="$1"
-    local -r array_name="$2[@]"
-    local current_item
-
-    for current_item in "${!array_name}"; do
-        if [[ "${current_item}" == "${item}" ]]; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-##
-## @brief      Determines whether an installer application supports the
-##             option `--applicationpath`.
-##
-## @param      $1       The path to an installer application.
-##
-## @retval     `true`   The installer application supports the option
-##                      `--applicationpath`.
-## @retval     `false`  Otherwise.
-##
-has_applicationpath_option() {
-    local -r installer_application_path="$1"
-
-    "${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" >/dev/null
-}
-
-##
-## @brief      Executes a PlistBuddy command on a property list file.
-##
-## @param      $1    The command to be executed by PlistBuddy.
-## @param      $2    A property list file.
-##
-## @return     The output of PlistBuddy.
-##
-execute_plist_buddy_command() {
-    local -r plist_command="$1"
-    local -r plist_file="$2"
-
-    is_not_empty "${plist_command}" || return 1
-    is_not_empty "${plist_file}" || return 1
-
-    /usr/libexec/PlistBuddy -c "${plist_command}" "${plist_file}" 2>/dev/null
-}
-
-##
-## @brief      Gets the name of the current operating system.
-##
-## @return     The operating system name.
-##
-get_os_name() {
-    local os_name
-
-    os_name="$(uname -s 2>/dev/null)" || return 1
-
-    echo "${os_name}"
-}
-
-##
-## @brief      Creates a macOS name and version string for output to the
-##             user.
-##
-## @param      $1    A macOS minor version number (e.g. '12').
-## @param      $2    A macOS patch version number (e.g. '2').
-##
-## @return     The macOS version name and version number as string (e.g.
-##             'macOS Sierra 10.12.2').
-##
-create_macos_name_and_version() {
-    local -r -i macos_minor_version="${1:-0}"
-    local -r -i macos_patch_version="${2:-0}"
-    local -i largest_known_macos_minor_version="${#const_macos_names[@]}"
-    local macos_name="macOS"
-    local macos_version
-
-    (( --largest_known_macos_minor_version ))
-
-    if (( (macos_minor_version < 0) || (macos_patch_version < 0) )); then
-        return 1
-    fi
-
-    if (( macos_minor_version <= largest_known_macos_minor_version )); then
-        macos_name="${const_macos_names[${macos_minor_version}]}"
-    fi
-
-    if (( macos_patch_version > 0 )); then
-        macos_version="10.${macos_minor_version}.${macos_patch_version}"
-    else
-        macos_version="10.${macos_minor_version}"
-    fi
-
-    echo "${macos_name} ${macos_version}"
-}
-
-##
-## @brief      Gets the value of an entry in a property list file.
-##
-## @param      $1    A property list entry name.
-## @param      $2    A property list file.
-##
-## @return     The value of the specified property list entry.
-##
-get_plist_value() {
-    local -r entry="$1"
-    local -r plist_file="$2"
-
-    is_not_empty "${entry}" || return 1
-    is_not_empty "${plist_file}" || return 1
-
-    execute_plist_buddy_command "Print '${entry}'" "${plist_file}"
-}
-
-##
 ## @brief      Gets the display name of an installer application.
 ##
 ## @param      $1    The path to an installer application.
@@ -803,123 +1278,6 @@ get_installer_application_display_name() {
     is_not_empty "${installer_application_path}" || return 1
 
     get_plist_value ":CFBundleDisplayName" "${installer_application_path}/Contents/Info.plist"
-}
-
-##
-## @brief      Gets the 'short version string' of an installer
-##             application.
-##
-## @param      $1    The path to an installer application.
-##
-## @return     The installer application 'short version string'.
-##
-get_installer_application_short_version_string()
-{
-    local -r installer_application_path="$1"
-
-    is_not_empty "${installer_application_path}" || return 1
-
-    get_plist_value ":CFBundleShortVersionString" "${installer_application_path}/Contents/Info.plist"
-}
-
-##
-## @brief      Gets the 'identifier' of an installer application.
-##
-## @param      $1    The path to an installer application.
-##
-## @return     The installer application 'identifier'.
-##
-get_installer_application_identifier()
-{
-    local -r installer_application_path="$1"
-
-    is_not_empty "${installer_application_path}" || return 1
-
-    get_plist_value ":CFBundleIdentifier" "${installer_application_path}/Contents/Info.plist"
-}
-
-##
-## @brief      Gets the URL of the system image within an installer
-##             application.
-##
-## @param      $1    The path to an installer application.
-##
-## @return     The URL of the system image.
-##
-get_system_image_url()
-{
-    local -r installer_application_path="$1"
-
-    is_not_empty "${installer_application_path}" || return 1
-
-    get_plist_value ":System Image Info:URL" "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"
-}
-
-##
-## @brief      Gets the absolute logical path to a file or directory.
-##
-## @param      $1    An absolute or relative path to a file or
-##                   directory.
-##
-## @return     The absolute logical (i.e. not the physical) path to the
-##             file or directory.
-##
-get_absolute_logical_path() {
-    local -r file_or_directory="$1"
-
-    is_not_empty "${file_or_directory}" || return 1
-    is_existing "${file_or_directory}" || return 1
-
-    if is_directory "${file_or_directory}"; then
-        echo "$(cd "${file_or_directory}"; pwd -L)"
-    else
-        if [[ "${file_or_directory}" == */* ]]; then
-            echo "$(cd "${file_or_directory%/*}"; pwd -L)/${file_or_directory##*/}"
-        else
-            echo "$(pwd -L)/${file_or_directory}"
-        fi
-    fi
-    return 0
-}
-
-##
-## @brief      Asks the user for consent on the command line. Any user
-##             input starting with 'y' or 'Y' will be treated as
-##             consent.
-##
-## @param      $1       A prompt to be displayed on the command line.
-##
-## @retval     `true`   The user gave his consent.
-## @retval     `false`  Otherwise.
-##
-get_user_consent() {
-    local -r prompt="$1"
-    local input
-    local -r yes_regex='^[yY].*$'
-
-    echo -n "${prompt}"
-    IFS= read -r input
-
-    [[ "${input}" =~ ${yes_regex} ]]
-}
-
-##
-## @brief      Creates an example for an installer application name for
-##             output to the user (e.g. 'Install macOS Sierra.app').
-##
-create_example_installer_application_name() {
-    local -r -i number_of_elements="${#const_supported_installer_application_display_names[@]}"
-    local example_installer_application_name="${const_supported_installer_application_display_names[${number_of_elements}-1]}.app"
-    local -i i
-
-    for (( i = number_of_elements - 1; i >= 0; i-- )); do
-        if is_valid_installer_application_path "/Applications/${const_supported_installer_application_display_names[${i}]}.app"; then
-            example_installer_application_name="${const_supported_installer_application_display_names[${i}]}.app"
-            break
-        fi
-    done
-
-    echo "${example_installer_application_name}"
 }
 
 ##
@@ -984,6 +1342,92 @@ get_installer_minimum_macos_version() {
 }
 
 ##
+## @brief      Gets the 'short version string' of an installer
+##             application.
+##
+## @param      $1    The path to an installer application.
+##
+## @return     The installer application 'short version string'.
+##
+get_installer_application_short_version_string()
+{
+    local -r installer_application_path="$1"
+
+    is_not_empty "${installer_application_path}" || return 1
+
+    get_plist_value ":CFBundleShortVersionString" "${installer_application_path}/Contents/Info.plist"
+}
+
+##
+## @brief      Gets the 'identifier' of an installer application.
+##
+## @param      $1    The path to an installer application.
+##
+## @return     The installer application 'identifier'.
+##
+get_installer_application_identifier()
+{
+    local -r installer_application_path="$1"
+
+    is_not_empty "${installer_application_path}" || return 1
+
+    get_plist_value ":CFBundleIdentifier" "${installer_application_path}/Contents/Info.plist"
+}
+
+##
+## @brief      Gets the URL of the system image within an installer
+##             application.
+##
+## @param      $1    The path to an installer application.
+##
+## @return     The URL of the system image.
+##
+get_system_image_url()
+{
+    local -r installer_application_path="$1"
+
+    is_not_empty "${installer_application_path}" || return 1
+
+    get_plist_value ":System Image Info:URL" "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"
+}
+
+##
+## @brief      Creates a macOS name and version string for output to the
+##             user.
+##
+## @param      $1    A macOS minor version number (e.g. '12').
+## @param      $2    A macOS patch version number (e.g. '2').
+##
+## @return     The macOS version name and version number as string (e.g.
+##             'macOS Sierra 10.12.2').
+##
+create_macos_name_and_version() {
+    local -r -i macos_minor_version="${1:-0}"
+    local -r -i macos_patch_version="${2:-0}"
+    local -i largest_known_macos_minor_version="${#const_macos_names[@]}"
+    local macos_name="macOS"
+    local macos_version
+
+    (( --largest_known_macos_minor_version ))
+
+    if (( (macos_minor_version < 0) || (macos_patch_version < 0) )); then
+        return 1
+    fi
+
+    if (( macos_minor_version <= largest_known_macos_minor_version )); then
+        macos_name="${const_macos_names[${macos_minor_version}]}"
+    fi
+
+    if (( macos_patch_version > 0 )); then
+        macos_version="10.${macos_minor_version}.${macos_patch_version}"
+    else
+        macos_version="10.${macos_minor_version}"
+    fi
+
+    echo "${macos_name} ${macos_version}"
+}
+
+##
 ## @brief      Creates an install media on the specified volume using
 ##             the `createinstallmedia` command from the installer
 ##             application. **Please note:** The volume will be
@@ -1017,40 +1461,6 @@ create_install_media() {
     fi
 
     return "${exit_status}"
-}
-
-##
-## @brief      Determines whether the command `script -k -q /dev/null
-##             .../createinstallmedia ...` was canceled by a SIGINT
-##             signal (i.e. user pressed Ctrl-C).
-##
-## @param      $1       The exit status of the command `script -k -q
-##                      /dev/null .../createinstallmedia ...`.
-##
-## @retval     `true`   The command was canceled by a SIGINT signal.
-## @retval     `false`  Otherwise.
-##
-script_createinstallmedia_canceled_by_sigint() {
-    local -r -i exit_status="$1"
-
-    [[ "${exit_status}" == 2 ]]
-}
-
-##
-## @brief      Determines whether the command `script -k -q /dev/null
-##             .../createinstallmedia ...` was canceled by a SIGQUIT
-##             signal (i.e. user pressed Ctrl-/).
-##
-## @param      $1       The exit status of the command `script -k -q
-##                      /dev/null .../createinstallmedia ...`.
-##
-## @retval     `true`   The command was canceled by a SIGQUIT signal.
-## @retval     `false`  Otherwise.
-##
-script_createinstallmedia_canceled_by_sigquit() {
-    local -r -i exit_status="$1"
-
-    [[ "${exit_status}" == 3 ]]
 }
 
 ##
@@ -1164,6 +1574,40 @@ parse_create_install_media() {
 }
 
 ##
+## @brief      Determines whether the command `script -k -q /dev/null
+##             .../createinstallmedia ...` was canceled by a SIGINT
+##             signal (i.e. user pressed Ctrl-C).
+##
+## @param      $1       The exit status of the command `script -k -q
+##                      /dev/null .../createinstallmedia ...`.
+##
+## @retval     `true`   The command was canceled by a SIGINT signal.
+## @retval     `false`  Otherwise.
+##
+script_createinstallmedia_canceled_by_sigint() {
+    local -r -i exit_status="$1"
+
+    [[ "${exit_status}" == 2 ]]
+}
+
+##
+## @brief      Determines whether the command `script -k -q /dev/null
+##             .../createinstallmedia ...` was canceled by a SIGQUIT
+##             signal (i.e. user pressed Ctrl-/).
+##
+## @param      $1       The exit status of the command `script -k -q
+##                      /dev/null .../createinstallmedia ...`.
+##
+## @retval     `true`   The command was canceled by a SIGQUIT signal.
+## @retval     `false`  Otherwise.
+##
+script_createinstallmedia_canceled_by_sigquit() {
+    local -r -i exit_status="$1"
+
+    [[ "${exit_status}" == 3 ]]
+}
+
+##
 ## @brief      Creates an ISO image file from a source image file.
 ##
 ## @param      $1    The source image file.
@@ -1194,42 +1638,6 @@ create_iso_image() {
     fi
 
     return "${exit_status}"
-}
-
-##
-## @brief      Determines whether the command `hdiutil makehybrid ...`
-##             was canceled by a SIGINT signal (i.e. user pressed
-##             Ctrl-C).
-##
-## @param      $1       The typescript file created by the command
-##                      `hdiutil makehybrid ...`.
-##
-## @retval     `true`   The command was canceled by a SIGINT signal.
-## @retval     `false`  Otherwise.
-##
-script_hdiutil_makehybrid_canceled_by_sigint() {
-    local -r typescript_file="$1"
-
-    is_not_empty "${typescript_file}" || return 1
-
-    grep --regexp="canceling\.\.\." "${typescript_file}" >/dev/null
-}
-
-##
-## @brief      Determines whether the command `hdiutil makehybrid ...`
-##             was canceled by a SIGQUIT signal (i.e. user pressed
-##             Ctrl-/).
-##
-## @param      $1       The exit status of the command `hdiutil
-##                      makehybrid ...`.
-##
-## @retval     `true`   The command was canceled by a SIGQUIT signal.
-## @retval     `false`  Otherwise.
-##
-script_hdiutil_makehybrid_canceled_by_sigquit() {
-    local -r -i exit_status="$1"
-
-    [[ "${exit_status}" == 3 ]]
 }
 
 ##
@@ -1361,443 +1769,55 @@ parse_create_iso_image() {
 }
 
 ##
-## @brief      Prints an error message about an invalid option and
-##             exits.
+## @brief      Determines whether the command `hdiutil makehybrid ...`
+##             was canceled by a SIGINT signal (i.e. user pressed
+##             Ctrl-C).
 ##
-## @param      $1    The option as provided on the command line
-##                   (including leading '-' or '--').
+## @param      $1       The typescript file created by the command
+##                      `hdiutil makehybrid ...`.
 ##
-exit_invalid_option() {
-    local -r option="$1"
+## @retval     `true`   The command was canceled by a SIGINT signal.
+## @retval     `false`  Otherwise.
+##
+script_hdiutil_makehybrid_canceled_by_sigint() {
+    local -r typescript_file="$1"
 
-    if is_long_option "${option}"; then
-        print_error "${const_script_name}: unrecognized option \`${option}'"
-    else
-        print_error "${const_script_name}: invalid option -- ${option:1}"
-    fi
+    is_not_empty "${typescript_file}" || return 1
 
-    print_error_usage
-    exit_with_status 255
+    grep --regexp="canceling\.\.\." "${typescript_file}" >/dev/null
 }
 
 ##
-## @brief      Prints an error message about a missing option parameter
-##             for an option and exits.
+## @brief      Determines whether the command `hdiutil makehybrid ...`
+##             was canceled by a SIGQUIT signal (i.e. user pressed
+##             Ctrl-/).
 ##
-## @param      $1    The option as provided on the command line
-##                   (including leading '-' or '--').
+## @param      $1       The exit status of the command `hdiutil
+##                      makehybrid ...`.
 ##
-exit_missing_option_parameter_for_option() {
-    local -r option="$1"
-
-    if is_long_option "${option}"; then
-        print_error "${const_script_name}: option \`${option}' requires an argument"
-    else
-        print_error "${const_script_name}: option requires an argument -- ${option:1}"
-    fi
-
-    print_error_usage
-    exit_with_status 255
-}
-
+## @retval     `true`   The command was canceled by a SIGQUIT signal.
+## @retval     `false`  Otherwise.
 ##
-## @brief      Prints an error message about specifying an option
-##             parameter for a long option where no parameter is allowed
-##             and exits.
-##
-## @param      $1    The long option as provided on the command line
-##                   (including leading '--').
-##
-exit_no_option_parameter_allowed_for_long_option(){
-    local -r long_option="$1"
-
-    print_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
-
-    print_error_usage
-    exit_with_status 255
-}
-
-##
-## @brief      Prints an error message about an ambiguous specification
-##             for a long option and exits.
-##
-## @param      $1    The long option as provided on the command line
-##                   (including leading '--').
-##
-exit_ambiguous_long_option() {
-    local -r long_option="$1"
-
-    print_error "${const_script_name}: option \`${long_option}' is ambiguous"
-
-    print_error_usage
-    exit_with_status 255
-}
-
-##
-## @brief      Exits the script with the specified exit status and an
-##             prints optional error message(s).
-##
-## @param      $1    The exit status.
-## @param      $2    Optional error message text(s).
-##
-exit_with_status() {
+script_hdiutil_makehybrid_canceled_by_sigquit() {
     local -r -i exit_status="$1"
-    local -a error_messages
 
-    shift
-    error_messages=("$@")
-
-    if (( ${#error_messages[@]} > 0 )); then
-        print_error "${error_messages[@]}"
-    fi
-
-    exit "${exit_status}"
+    [[ "${exit_status}" == 3 ]]
 }
 
-# ======================================================================
-# Main function
-# ======================================================================
-
-main() {
-    set_shell_options
-    set_traps
-
-    # ==================================================================
-    # Check operating system requirements
-    # ==================================================================
-
-    local os_name
-
-    local macos_version_string
-    local -i -a macos_version
-    local -i macos_major_version
-    local -i macos_minor_version
-    local -i macos_patch_version
-    local -i macos_version_for_compare
-    local macos_name_and_version
-
-    os_name="$(get_os_name)" || exit_with_status 251 "Couldn't get operating system name."
-    is_macos "${os_name}" || exit_with_status 250 "This tool must be run on macOS."
-
-    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" && IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_status 248 "Couldn't get macOS version."
-    macos_major_version="${macos_version[0]:-0}"
-    macos_minor_version="${macos_version[1]:-0}"
-    macos_patch_version="${macos_version[2]:-0}"
-    (( macos_version_for_compare = (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))
-
-    if is_unsupported_macos_minor_version "${macos_minor_version}"; then
-        macos_name_and_version="$(create_macos_name_and_version "${const_supported_macos_minor_versions[0]}")" || exit_with_status 247 "Invalid macOS version."
-        exit_with_status 246 "This tool requires ${macos_name_and_version} or later."
-    fi
-
-    if ! is_supported_macos_minor_version "${macos_minor_version}"; then
-        macos_name_and_version="$(create_macos_name_and_version "${macos_minor_version}" "${macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
-        print_warning "This tool has not been tested on ${macos_name_and_version}."
-    fi
-
-    # ==================================================================
-    # Parse command line arguments
-    # ==================================================================
-
-    unset option_applicationpath
-    unset option_targetdirectory
-    local option_nointeraction="false"
-
-    local long_option
-    local option_parameter
-
-    # This script requires at least four arguments: Two options with one
-    # option parameter each. However, this does not take into account
-    # that one argument might already consist of an option and its
-    # option parameter.
-    #
-    # NOTE: This behavior is intended to replicate the behavior of
-    # Apple's command 'createinstallmedia' for creation of a bootable
-    # installer USB flash drive or other volume.
-    if (( $# < 4 )); then
-        print_error_usage
-        exit_with_status 0
-    fi
-
-    is_root || exit_with_status 249 "This tool must be run as root."
-
-    while [[ "${1+set}" == "set" ]]; do
-        case "$1" in
-
-            # Option '--applicationpath'
-            -a* | --a* )
-                long_option="--applicationpath"
-
-                if is_option_including_option_parameter "$1"; then
-                    if is_long_option "$1"; then
-                        is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
-                        option_parameter="${1#--*=}"
-                    else
-                        option_parameter="${1#-?}"
-                    fi
-                    shift
-                else
-                    if is_long_option "$1"; then
-                        is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
-                    fi
-                    [[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
-                    option_parameter="$2"
-                    shift 2
-                fi
-
-                option_applicationpath="${option_parameter}"
-                ;;
-
-            # Option '--targetdirectory'
-            -t* | --t* )
-                long_option="--targetdirectory"
-
-                if is_option_including_option_parameter "$1"; then
-                    if is_long_option "$1"; then
-                        is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
-                        option_parameter="${1#--*=}"
-                    else
-                        option_parameter="${1#-?}"
-                    fi
-                    shift
-                else
-                    if is_long_option "$1"; then
-                        is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
-                    fi
-                    [[ "${2+set}" == "set" ]] || exit_missing_option_parameter_for_option "$1"
-                    option_parameter="$2"
-                    shift 2
-                fi
-
-                option_targetdirectory="${option_parameter}"
-                ;;
-
-            # Option '--nointeraction'
-            -n* | --n* )
-                long_option="--nointeraction"
-
-                if is_long_option_including_option_parameter "$1"; then
-                    is_valid_long_option "${1%%=*}" "${long_option}" || exit_invalid_option "$1"
-                    exit_no_option_parameter_allowed_for_long_option "${1%%=*}"
-                elif is_long_option "$1"; then
-                    is_valid_long_option "$1" "${long_option}" || exit_invalid_option "$1"
-                    shift
-                elif is_short_options_combination "$1"; then
-                    set -- "-${1:2}" "${@:2}"
-                else
-                    shift
-                fi
-
-                option_nointeraction="true"
-                ;;
-
-            # End of options
-            -- )
-                shift
-                break
-                ;;
-
-            # Ambiguous long option
-            --=* )
-                exit_ambiguous_long_option "${1%%=*}"
-                ;;
-
-            # Invalid short or long option
-            -[^-]* | --?* )
-                exit_invalid_option "$1"
-                ;;
-
-            # Non-option argument or single '-'
-            * )
-                shift
-                ;;
-
-        esac
-    done
-
-    # ==================================================================
-    # Verify command line options
-    # ==================================================================
-
-    if [[ "${option_applicationpath+set}" != "set" || "${option_targetdirectory+set}" != "set" ]]; then
-        exit_with_status 255 "You must specify both the target directory and install application path."
-    fi
-
-    if ! is_valid_target_directory_path "${option_targetdirectory}"; then
-        exit_with_status 254 "${option_targetdirectory} is not a valid target directory."
-    fi
-
-    if ! is_valid_installer_application_path "${option_applicationpath}"; then
-        exit_with_status 253 "${option_applicationpath} does not appear to be a valid OS installer application."
-    fi
-
-    # ==================================================================
-    # Initialization
-    # ==================================================================
-
-    local installer_application_path
-    local target_directory_path
-    local installer_application_display_name
-    local -i installer_application_type
-    local iso_target_image
-    local random_string
-
-    installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 245 "Couldn't get absolute path for ${option_applicationpath}."
-    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_status 244 "Couldn't get absolute path for ${option_targetdirectory}."
-
-    installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 243 "Couldn't get installer application display name."
-    installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application type."
-    iso_target_image="${target_directory_path}/${installer_application_display_name}.iso"
-
-    global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_status 241 "Failed to create temporary directory."
-    random_string="${global_tmp_directory##*.}"
-
-    # ==================================================================
-    # Check installer application requirements
-    # ==================================================================
-
-    local installer_minimum_macos_version_string
-    local -i -a installer_minimum_macos_version
-    local -i installer_minimum_macos_major_version
-    local -i installer_minimum_macos_minor_version
-    local -i installer_minimum_macos_patch_version
-    local -i installer_minimum_macos_version_for_compare
-
-    if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
-        print_warning "${installer_application_display_name} is not a supported installer."
-    fi
-
-    if [[ "${installer_application_type}" == 3 ]]; then
-        installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_status 240 "Couldn't get minimum macOS version for installer application."
-        installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
-        installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-0}"
-        installer_minimum_macos_patch_version="${installer_minimum_macos_version[2]:-0}"
-        (( installer_minimum_macos_version_for_compare = (installer_minimum_macos_major_version * 10000) + (installer_minimum_macos_minor_version * 100) + installer_minimum_macos_patch_version ))
-
-        if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
-            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
-            exit_with_status 239 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
-        fi
-    fi
-
-    # ==================================================================
-    # Perform required user interactions
-    # ==================================================================
-
-    local type_of_existing_target
-
-    if is_existing "${iso_target_image}"; then
-        if is_file "${iso_target_image}"; then
-            type_of_existing_target="file"
-        else
-            type_of_existing_target="directory"
-        fi
-        if [[ ! "${option_nointeraction}" == "true" ]]; then
-            echo "Ready to start."
-            echo "To continue we need to delete the ${type_of_existing_target} ${iso_target_image}."
-            if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
-                echo "Operation canceled."
-                exit_with_status 0
-            fi
-        fi
-
-        rm -rf "${iso_target_image}" >/dev/null || exit_with_status 238 "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
-    fi
-
-    # ==================================================================
-    # Create source image for ISO image
-    # ==================================================================
-
-    local iso_source_image
-    local install_esd_image
-    local install_esd_shadow
-    local base_system_image
-    local install_disk_image
-    local install_disk_volname
-    local core_services_directory
-
-    case "${installer_application_type}" in
-
-        # Installer application type '1' for:
-        # - Mac OS X Lion 10.7
-        # - OS X Mountain Lion 10.8
-        1 )
-            iso_source_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
-            ;;
-
-        # Installer application type '2' for:
-        # - OS X Mavericks 10.9
-        # - OS X Yosemite 10.10
-        # - OS X El Capitan 10.11
-        2 )
-            install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
-            install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
-            global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
-            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 237 "Mount of outer dmg failed."
-
-            base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
-            is_file "${base_system_image}" || exit_with_status 236 "BaseSystem missing from the outer dmg, damaged installer image?"
-
-            install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
-            global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
-
-            echo "Creating disk image from installer image..."
-            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap >/dev/null || exit_with_status 235 "Failed to convert BaseSystem.dmg."
-            hdiutil resize -size 16g "${install_disk_image}" >/dev/null || exit_with_status 234 "Failed to resize disk image."
-            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 233 "The disk image did not mount."
-
-            echo "Copying installer files to disk image..."
-            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" >/dev/null || exit_with_status 232 "Failed to delete Packages symlink."
-            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" >/dev/null || exit_with_status 231 "Failed to copy Packages directory."
-
-            echo "Making disk image bootable..."
-            core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
-            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_status 230 "The bless of the installer disk image failed."
-
-            echo "Copying installer image..."
-            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 229 "Failed to copy BaseSystem.dmg."
-            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 228 "Failed to copy BaseSystem.chunklist."
-
-            hdiutil detach "${global_install_esd_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
-            unset global_install_esd_mountpoint
-
-            hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
-            unset global_install_disk_mountpoint
-
-            iso_source_image="${install_disk_image}"
-            ;;
-
-        # Installer application type '3' for:
-        # - macOS Sierra 10.12
-        # - macOS High Sierra 10.13
-        # - macOS Mojave 10.14
-        3 )
-            echo "Creating empty disk image..."
-            install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
-            install_disk_volname="InstallMedia.${random_string}"
-            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_status 226 "Failed to create disk image."
-            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_status 233 "The disk image did not mount."
-
-            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 225 "Failed to convert disk image to bootable install media."
-
-            hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
-            unset global_install_disk_device_node
-
-            iso_source_image="${install_disk_image}"
-            ;;
-
-    esac
-
-    # ==================================================================
-    # Create ISO image
-    # ==================================================================
-
-    global_incomplete_iso_target_image="${iso_target_image}"
-    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 224 "Failed to create ISO image."
-    unset global_incomplete_iso_target_image
-
-    echo "Install ISO image now available at \"${target_directory_path}/\""
-    exit_with_status 0
+##
+## @brief      Determines whether an installer application supports the
+##             option `--applicationpath`.
+##
+## @param      $1       The path to an installer application.
+##
+## @retval     `true`   The installer application supports the option
+##                      `--applicationpath`.
+## @retval     `false`  Otherwise.
+##
+has_applicationpath_option() {
+    local -r installer_application_path="$1"
+
+    "${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" >/dev/null
 }
 
 { main "$@"; } 102>&2 2>/dev/null
