@@ -1234,6 +1234,7 @@ is_valid_installer_application_path() {
             ;;
 
     esac
+
     return 1
 }
 
