@@ -52,6 +52,9 @@ declare -r -a const_supported_macos_minor_versions=(
     "10" # OS X Yosemite         10.10
     "11" # OS X El Capitan       10.11
     "12" # macOS Sierra          10.12
+    "13" # macOS High Sierra     10.13
+    "14" # macOS Mojave          10.14
+    "15" # macOS Catalina        10.15
 )
 
 # This script has been tested with the following installer applications.
@@ -62,6 +65,9 @@ declare -r -a const_supported_installer_application_display_names=(
     "Install OS X Yosemite"      # 10.10
     "Install OS X El Capitan"    # 10.11
     "Install macOS Sierra"       # 10.12
+    "Install macOS High Sierra"  # 10.13
+    "Install macOS Mojave"       # 10.14
+    "Install macOS Catalina"     # 10.15
 )
 
 # List of all known macOS version names.
@@ -412,6 +418,7 @@ main() {
         # - macOS Sierra 10.12
         # - macOS High Sierra 10.13
         # - macOS Mojave 10.14
+        # - macOS Catalina 10.15
         3 )
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
@@ -1194,6 +1201,7 @@ is_valid_installer_application_path() {
         # - macOS Sierra 10.12
         # - macOS High Sierra 10.13
         # - macOS Mojave 10.14
+        # - macOS Catalina 10.15
         3 )
             # Apple's command 'createinstallmedia' is required because
             # it will be used to create the installer disk image.
@@ -1291,6 +1299,7 @@ get_installer_application_display_name() {
 ##               - macOS Sierra 10.12
 ##               - macOS High Sierra 10.13
 ##               - macOS Mojave 10.14
+##               - macOS Catalina 10.15
 ##
 ## @param      $1    The path to an installer application.
 ##
