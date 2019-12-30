@@ -1158,6 +1158,13 @@ is_valid_installer_application_path() {
 
     case "${installer_application_type}" in
 
+        # Installer application type '0' for:
+        # - Unknown type
+        # - Stub installer
+        0 )
+            return 1
+            ;;
+
         # Installer application type '1' for:
         # - Mac OS X Lion 10.7
         # - OS X Mountain Lion 10.8
@@ -1287,7 +1294,9 @@ get_installer_application_display_name() {
 ##
 ##             The returned types are:
 ##
-##             * Installer application type '0' for an unknown type.
+##             * Installer application type '0' for:
+##               - Unknown type
+##               - Stub installer
 ##             * Installer application type '1' for:
 ##               - Mac OS X Lion 10.7
 ##               - OS X Mountain Lion 10.8
@@ -1312,14 +1321,20 @@ get_installer_application_type()
 
     is_not_empty "${installer_application_path}" || return 1
 
-    if is_file "${installer_application_path}/Contents/Resources/createinstallmedia"; then
-        if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
-            installer_application_type=3
+    # Each type of installer application must contain the directory
+    # '/Contents/SharedSupport/'. If it does not exist, the type of the
+    # installer application is unknown or the installer application is
+    # an incomplete stub installer.
+    if is_directory "${installer_application_path}/Contents/SharedSupport/"; then
+        if is_file "${installer_application_path}/Contents/Resources/createinstallmedia"; then
+            if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
+                installer_application_type=3
+            else
+                installer_application_type=2
+            fi
         else
-            installer_application_type=2
+            installer_application_type=1
         fi
-    else
-        installer_application_type=1
     fi
 
     echo "${installer_application_type}"
