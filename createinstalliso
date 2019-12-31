@@ -426,7 +426,7 @@ main() {
             hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_status 226 "Failed to create disk image."
             global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_status 233 "The disk image did not mount."
 
-            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 225 "Failed to convert disk image to bootable install media."
+            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 225 "Failed to convert disk image into bootable install media."
 
             hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
             unset global_install_disk_device_node
