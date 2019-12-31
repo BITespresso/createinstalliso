@@ -1178,9 +1178,9 @@ is_valid_installer_application_path() {
         # - OS X Yosemite 10.10
         # - OS X El Capitan 10.11
         2 )
-            # Apple's command 'createinstallmedia' is required because
-            # it will be used to create the installer disk image.
-            is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
+            # This file is required because it contains all the files
+            # required to build the installer disk image.
+            is_file "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg" || return 1
 
             # All subsequent checks are the same as those performed by
             # Apple's command 'createinstallmedia' to determine if the
