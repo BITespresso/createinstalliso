@@ -314,7 +314,7 @@ main() {
     fi
 
     if [[ "${installer_application_type}" == 3 ]]; then
-        installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}") || exit_with_status 240 "Couldn't get minimum macOS version for installer application."
+        installer_minimum_macos_version_string="10.8" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}")
         installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
         installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-0}"
         installer_minimum_macos_patch_version="${installer_minimum_macos_version[2]:-0}"
@@ -1140,9 +1140,6 @@ is_valid_installer_application_path() {
     local installer_application_identifier
     local valid_installer_application_identifier_regex='^com\.apple\.InstallAssistant\.[a-zA-Z0-9.-]+$'
 
-    local installer_minimum_macos_version_string
-    local valid_installer_minimum_macos_version_string_regex='^[[:digit:]]+\.[[:digit:]]+\.?[[:digit:]]*$'
-
     local system_image_url
 
     is_not_empty "${installer_application_path}" || return 1
@@ -1213,17 +1210,6 @@ is_valid_installer_application_path() {
             # Apple's command 'createinstallmedia' is required because
             # it will be used to create the installer disk image.
             is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
-
-            # This file is required because it contains the value for
-            # 'LSMinimumSystemVersion', which determines the minimum
-            # required macOS version for the installer application. The
-            # value itself must be a valid macOS version number.
-            if is_file "${installer_application_path}/Contents/Info.plist"; then
-                installer_minimum_macos_version_string="$(get_installer_minimum_macos_version "${installer_application_path}")" || return 1
-                [[ "${installer_minimum_macos_version_string}" =~ ${valid_installer_minimum_macos_version_string_regex} ]] || return 1
-            else
-                return 1
-            fi
 
             # All subsequent checks are the same as those performed by
             # Apple's command 'createinstallmedia' to determine if the
@@ -1338,23 +1324,6 @@ get_installer_application_type()
     fi
 
     echo "${installer_application_type}"
-}
-
-##
-## @brief      Gets the minimum macOS version required by the installer
-##             application.
-##
-## @param      $1    The path to an installer application.
-##
-## @return     The minimum macOS version required by the installer
-##             application.
-##
-get_installer_minimum_macos_version() {
-    local -r installer_application_path="$1"
-
-    is_not_empty "${installer_application_path}" || return 1
-
-    get_plist_value ":LSMinimumSystemVersion" "${installer_application_path}/Contents/Info.plist"
 }
 
 ##
