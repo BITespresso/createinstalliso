@@ -1095,7 +1095,7 @@ is_unsupported_macos_minor_version() {
 ##
 ## @param      $1       A macOS version as string (e.g. '10.12.2').
 ##
-## @retval     `true`   The macOS version is unsupported.
+## @retval     `true`   The macOS version is supported.
 ## @retval     `false`  Otherwise.
 ##
 is_supported_macos_minor_version() {
