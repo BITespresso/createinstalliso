@@ -310,7 +310,7 @@ main() {
     local -i installer_minimum_macos_version_for_compare
 
     if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
-        print_warning "${installer_application_display_name} is not a supported installer."
+        print_warning "${installer_application_display_name} has not been tested with this tool."
     fi
 
     if [[ "${installer_application_type}" == 3 ]]; then
