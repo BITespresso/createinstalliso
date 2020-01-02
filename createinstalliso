@@ -453,6 +453,29 @@ main() {
 # ======================================================================
 
 ##
+## @brief      Writes arguments to the standard output with a trailing
+##             newline character. This is a safer replacement for the
+##             builtin 'echo' command using the 'printf' command.
+##
+## @param      $*    The argument(s).
+##
+echo() {
+    IFS=' ' printf '%s\n' "$*"
+}
+
+##
+## @brief      Writes arguments to the standard output without a
+##             trailing newline character. This is a safer replacement
+##             for the builtin 'echo' command using the 'printf'
+##             command.
+##
+## @param      $*    The argument(s).
+##
+echo_n() {
+    IFS=' ' printf '%s' "$*"
+}
+
+##
 ## @brief      Gets the name of the current operating system.
 ##
 ## @return     The operating system name.
@@ -615,7 +638,7 @@ get_user_consent() {
     local input
     local -r yes_regex='^[yY].*$'
 
-    echo -n "${prompt}"
+    echo_n "${prompt}"
     IFS= read -r input
 
     [[ "${input}" =~ ${yes_regex} ]]
@@ -674,7 +697,7 @@ trim() {
     # Remove trailing whitespace
     string="${string%"${string##*[![:space:]]}"}"
 
-    echo -n "${string}"
+    echo_n "${string}"
 }
 
 # ======================================================================
@@ -835,7 +858,7 @@ print_warning() {
     # The file descriptor for stderr is '102', because in this script
     # '2' is redirected to '/dev/null' to suppress unwanted output to
     # stderr.
-    echo -n "WARNING: " >&102 102>&-
+    echo_n "WARNING: " >&102 102>&-
     echo "$@" >&102 102>&-
 }
 
@@ -1513,9 +1536,9 @@ parse_create_install_media() {
         if [[ "${char}" == $'\n' ]]; then
             if [[ "${is_line_mute}" == "false" ]]; then
                 if [[ "${is_newline_mute}" == "true" ]]; then
-                    echo -n "${text_buffer:0:${#text_buffer}-1}"
+                    echo_n "${text_buffer:0:${#text_buffer}-1}"
                 else
-                    echo -n "${text_buffer}"
+                    echo_n "${text_buffer}"
                 fi
             fi
 
@@ -1535,12 +1558,12 @@ parse_create_install_media() {
                         fi
 
                         if [[ "${trigger_copying_line/"${separator}${text_buffer}${separator}"}" != "${trigger_copying_line}" ]]; then
-                            echo -n "Copying installer files to disk image..."
-                            echo -n $'\r\n'
+                            echo_n "Copying installer files to disk image..."
+                            echo_n $'\r\n'
                         fi
 
                         if [[ "${trigger_making_line/"${separator}${text_buffer}${separator}"}" != "${trigger_making_line}" ]]; then
-                            echo -n "Making disk image bootable..."
+                            echo_n "Making disk image bootable..."
                         fi
 
                         text_buffer=""
@@ -1548,14 +1571,14 @@ parse_create_install_media() {
 
                     break
                 else
-                    echo -n "${text_buffer:0:1}"
+                    echo_n "${text_buffer:0:1}"
                     text_buffer="${text_buffer:1}"
                 fi
             done
         fi
     done
 
-    echo -n "${text_buffer}"
+    echo_n "${text_buffer}"
 }
 
 ##
@@ -1693,7 +1716,7 @@ parse_create_iso_image() {
             fi
 
             if [[ "${is_line_mute}" == "false" ]]; then
-                echo -n "${text_buffer}"
+                echo_n "${text_buffer}"
             fi
 
             is_line_mute="false"
@@ -1708,7 +1731,7 @@ parse_create_iso_image() {
 
                         if [[ "${trigger_progress_line/"${separator}${text_buffer}${separator}"}" != "${trigger_progress_line}" ]]; then
                             is_progress_line="true"
-                            echo -n "Creating ISO image: 0%..."
+                            echo_n "Creating ISO image: 0%..."
                         fi
 
                         if [[ "${trigger_mute/"${separator}${text_buffer}${separator}"}" != "${trigger_mute}" ]]; then
@@ -1731,10 +1754,10 @@ parse_create_iso_image() {
 
                             for percent_step in "${percent_steps[@]}"; do
                                 if (( (last_percent < percent_step) && (percent >= percent_step) )); then
-                                    echo -n " ${percent_step}%"
+                                    echo_n " ${percent_step}%"
 
                                     if [[ "${percent_step}" != 100 ]]; then
-                                        echo -n "..."
+                                        echo_n "..."
                                     fi
                                 fi
                             done
@@ -1743,14 +1766,14 @@ parse_create_iso_image() {
                         fi
                     fi
 
-                    echo -n "${text_buffer:0:1}"
+                    echo_n "${text_buffer:0:1}"
                     text_buffer="${text_buffer:1}"
                 fi
             done
         fi
     done
 
-    echo -n "${text_buffer}"
+    echo_n "${text_buffer}"
 }
 
 ##
