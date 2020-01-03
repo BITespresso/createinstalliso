@@ -313,6 +313,8 @@ main() {
         print_warning "${installer_application_display_name} has not been tested with this tool."
     fi
 
+    # An installer application type '3' requires OS X Mountain Lion 10.8
+    # or higher to run 'createinstallmedia'.
     if [[ "${installer_application_type}" == 3 ]]; then
         installer_minimum_macos_version_string="10.8" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}")
         installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
