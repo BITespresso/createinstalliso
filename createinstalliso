@@ -1450,6 +1450,8 @@ create_macos_name_and_version() {
 create_install_media() {
     local -r installer_application_path="$1"
     local -r install_disk_volname="$2"
+    local applicationpath_option_name=""
+    local applicationpath_option_parameter=""
     local unused
     local -i exit_status
 
@@ -1457,12 +1459,12 @@ create_install_media() {
     is_not_empty "${install_disk_volname}" || return 1
 
     if has_applicationpath_option "${installer_application_path}"; then
-        { unused="$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --applicationpath "${installer_application_path}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-)"; } 4>&1
-        exit_status="$?"
-    else
-        { unused="$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-)"; } 4>&1
-        exit_status="$?"
+        applicationpath_option_name="--applicationpath"
+        applicationpath_option_parameter="${installer_application_path}"
     fi
+
+    { unused="$( { script -k -q /dev/null "${installer_application_path}/Contents/Resources/createinstallmedia" --volume "/Volumes/${install_disk_volname}" "${applicationpath_option_name}" "${applicationpath_option_parameter}" --nointeraction 2>/dev/null > >(parse_create_install_media); } 3>&1 >&4 4>&-)"; } 4>&1
+    exit_status="$?"
 
     if script_createinstallmedia_canceled_by_sigint "${exit_status}"; then
         kill_process_group_with_signal_name "SIGINT"
