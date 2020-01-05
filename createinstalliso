@@ -772,7 +772,7 @@ signal_handler() {
     kill -n "${signal_number}" "$$"
 
     if (( (signal_number >= min_signal_number) && (signal_number <= max_signal_number) )); then
-        exit $(( 128 + signal_number ))
+        exit "$(( 128 + signal_number ))"
     fi
 }
 
