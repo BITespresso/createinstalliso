@@ -129,7 +129,7 @@ main() {
 
     if is_unsupported_macos_minor_version "${macos_minor_version}"; then
         macos_name_and_version="$(create_macos_name_and_version "${const_supported_macos_minor_versions[0]}")" || exit_with_status 247 "Invalid macOS version."
-        exit_with_status 246 "This tool requires ${macos_name_and_version} or later."
+        exit_with_status 245 "This tool requires ${macos_name_and_version} or later."
     fi
 
     if ! is_supported_macos_minor_version "${macos_minor_version}"; then
@@ -288,14 +288,14 @@ main() {
     local iso_target_image
     local random_string
 
-    installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 245 "Couldn't get absolute path for ${option_applicationpath}."
-    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_status 244 "Couldn't get absolute path for ${option_targetdirectory}."
+    installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 244 "Couldn't get absolute path for ${option_applicationpath}."
+    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_status 243 "Couldn't get absolute path for ${option_targetdirectory}."
 
-    installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 243 "Couldn't get installer application display name."
-    installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application type."
+    installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application display name."
+    installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_status 241 "Couldn't get installer application type."
     iso_target_image="${target_directory_path}/${installer_application_display_name}.iso"
 
-    global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_status 241 "Failed to create temporary directory."
+    global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_status 240 "Failed to create temporary directory."
     random_string="${global_tmp_directory##*.}"
 
     # ------------------------------------------------------------------
@@ -324,7 +324,7 @@ main() {
 
         if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
             macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
-            exit_with_status 239 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
+            exit_with_status 238 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
         fi
     fi
 
@@ -350,7 +350,7 @@ main() {
             fi
         fi
 
-        rm -rf "${iso_target_image}" >/dev/null || exit_with_status 238 "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
+        rm -rf "${iso_target_image}" >/dev/null || exit_with_status 237 "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
     fi
 
     # ------------------------------------------------------------------
@@ -453,35 +453,35 @@ main() {
             install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
             install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
             global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
-            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 237 "Mount of outer dmg failed."
+            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 236 "Mount of outer dmg failed."
 
             base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
-            is_file "${base_system_image}" || exit_with_status 236 "BaseSystem missing from the outer dmg, damaged installer image?"
+            is_file "${base_system_image}" || exit_with_status 235 "BaseSystem missing from the outer dmg, damaged installer image?"
 
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
             global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
 
             echo "Creating disk image from installer image..."
-            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap >/dev/null || exit_with_status 235 "Failed to convert BaseSystem.dmg."
-            hdiutil resize -size 16g "${install_disk_image}" >/dev/null || exit_with_status 234 "Failed to resize disk image."
-            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 233 "The disk image did not mount."
+            hdiutil convert "${base_system_image}" -format UDSP -o "${install_disk_image}" -pmap >/dev/null || exit_with_status 234 "Failed to convert BaseSystem.dmg."
+            hdiutil resize -size 16g "${install_disk_image}" >/dev/null || exit_with_status 233 "Failed to resize disk image."
+            hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 232 "The disk image did not mount."
 
             echo "Copying installer files to disk image..."
-            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" >/dev/null || exit_with_status 232 "Failed to delete Packages symlink."
-            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" >/dev/null || exit_with_status 231 "Failed to copy Packages directory."
+            rm -f "${global_install_disk_mountpoint}/System/Installation/Packages" >/dev/null || exit_with_status 231 "Failed to delete Packages symlink."
+            cp -R -P -p "${global_install_esd_mountpoint}/Packages" "${global_install_disk_mountpoint}/System/Installation/" >/dev/null || exit_with_status 230 "Failed to copy Packages directory."
 
             echo "Making disk image bootable..."
             core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
-            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_status 230 "The bless of the installer disk image failed."
+            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_status 229 "The bless of the installer disk image failed."
 
             echo "Copying installer image..."
-            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 229 "Failed to copy BaseSystem.dmg."
-            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 228 "Failed to copy BaseSystem.chunklist."
+            cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 228 "Failed to copy BaseSystem.dmg."
+            cp -P -p "${base_system_image%.dmg}.chunklist" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 227 "Failed to copy BaseSystem.chunklist."
 
-            hdiutil detach "${global_install_esd_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
+            hdiutil detach "${global_install_esd_mountpoint}" -force >/dev/null || exit_with_status 226 "Couldn't unmount disk image."
             unset global_install_esd_mountpoint
 
-            hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
+            hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_status 226 "Couldn't unmount disk image."
             unset global_install_disk_mountpoint
 
             iso_source_image="${install_disk_image}"
@@ -496,12 +496,12 @@ main() {
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
             install_disk_volname="InstallMedia.${random_string}"
-            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_status 226 "Failed to create disk image."
-            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_status 233 "The disk image did not mount."
+            hdiutil create -size 16g "${install_disk_image}" -type SPARSE -fs HFS+J -volname "${install_disk_volname}" >/dev/null || exit_with_status 225 "Failed to create disk image."
+            global_install_disk_device_node="$(hdiutil attach "${install_disk_image}" -readwrite -nobrowse -noverify 2>/dev/null | (IFS=$' \t\n' read -r device_node remainder; echo "${device_node}"))" || exit_with_status 232 "The disk image did not mount."
 
-            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 225 "Failed to convert disk image into bootable install media."
+            create_install_media "${installer_application_path}" "${install_disk_volname}" || exit_with_status 224 "Failed to convert disk image into bootable install media."
 
-            hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 227 "Couldn't unmount disk image."
+            hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 226 "Couldn't unmount disk image."
             unset global_install_disk_device_node
 
             iso_source_image="${install_disk_image}"
@@ -514,7 +514,7 @@ main() {
     # ------------------------------------------------------------------
 
     global_incomplete_iso_target_image="${iso_target_image}"
-    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 224 "Failed to create ISO image."
+    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 223 "Failed to create ISO image."
     unset global_incomplete_iso_target_image
 
     echo "Install ISO image now available at \"${target_directory_path}/\""
@@ -2102,8 +2102,8 @@ are_one_same_device() {
     # The 'stat' command must be called with the '-L' option so that the
     # information reported by 'stat' refers to the target of the file,
     # if the file is a symbolic link, and not to the file itself.
-    device_id_1="$(stat -L -f "%d" "${file_or_directory_1}")" || exit_with_status 240 "Couldn't get device ID."
-    device_id_2="$(stat -L -f "%d" "${file_or_directory_2}")" || exit_with_status 240 "Couldn't get device ID."
+    device_id_1="$(stat -L -f "%d" "${file_or_directory_1}")" || exit_with_status 239 "Couldn't get device ID."
+    device_id_2="$(stat -L -f "%d" "${file_or_directory_2}")" || exit_with_status 239 "Couldn't get device ID."
 
     [[ "${device_id_1}" == "${device_id_2}" ]]
 }
@@ -2142,7 +2142,7 @@ exit_with_missing_disk_space() {
 
     human_readable_missing_disk_space="$(create_human_readable_byte_size "${missing_disk_space}" "1" "100000")"
 
-    exit_with_status 223 "${volume_name} is not large enough for ${human_readable_for_what}. An additional ${human_readable_missing_disk_space} is needed."
+    exit_with_status 246 "${volume_name} is not large enough for ${human_readable_for_what}. An additional ${human_readable_missing_disk_space} is needed."
 }
 
 { main "$@"; } 102>&2 2>/dev/null
