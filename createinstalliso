@@ -354,6 +354,77 @@ main() {
     fi
 
     # ------------------------------------------------------------------
+    # Check available disk space
+    # ------------------------------------------------------------------
+
+    local -i available_in_global_tmp_directory
+    local -i available_in_target_directory_path
+    local -i required_in_global_tmp_directory
+    local -i required_in_target_directory_path
+    local -i missing_in_global_tmp_directory
+    local -i missing_in_target_directory_path
+
+    available_in_global_tmp_directory="$(get_available_disk_space "${global_tmp_directory}")" || return 1
+    available_in_target_directory_path="$(get_available_disk_space "${target_directory_path}")" || return 1
+
+    case "${installer_application_type}" in
+
+        # Installer application type '1' for:
+        # - Mac OS X Lion 10.7
+        # - OS X Mountain Lion 10.8
+        1 )
+            (( required_in_global_tmp_directory = 0 ))
+
+            (( required_in_target_directory_path = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
+            ;;
+
+        # Installer application type '2' for:
+        # - OS X Mavericks 10.9
+        # - OS X Yosemite 10.10
+        # - OS X El Capitan 10.11
+        2 )
+            (( required_in_global_tmp_directory = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
+            (( required_in_global_tmp_directory = required_in_global_tmp_directory + (required_in_global_tmp_directory * 16 / 100) + 360000000 ))
+
+            (( required_in_target_directory_path = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_in_target_directory_path = required_in_target_directory_path + 1460000000 ))
+            ;;
+
+        # Installer application type '3' for:
+        # - macOS Sierra 10.12
+        # - macOS High Sierra 10.13
+        # - macOS Mojave 10.14
+        # - macOS Catalina 10.15
+        3 )
+            (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_in_global_tmp_directory = required_in_global_tmp_directory + 100000000 ))
+
+            (( required_in_target_directory_path = required_in_global_tmp_directory ))
+            ;;
+
+    esac
+
+    if are_one_same_device "${global_tmp_directory}" "${target_directory_path}"; then
+        (( missing_in_global_tmp_directory = (required_in_global_tmp_directory + required_in_target_directory_path) - available_in_global_tmp_directory ))
+
+        if (( missing_in_global_tmp_directory > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files and installer ISO image" "${missing_in_global_tmp_directory}"
+        fi
+    else
+        (( missing_in_global_tmp_directory = required_in_global_tmp_directory - available_in_global_tmp_directory ))
+
+        if (( missing_in_global_tmp_directory > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files" "${missing_in_global_tmp_directory}"
+        fi
+
+        (( missing_in_target_directory_path = required_in_target_directory_path - available_in_target_directory_path ))
+
+        if (( missing_in_target_directory_path > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${target_directory_path}")" "installer ISO image" "${missing_in_target_directory_path}"
+        fi
+    fi
+
+    # ------------------------------------------------------------------
     # Create source image for ISO image
     # ------------------------------------------------------------------
 
@@ -488,6 +559,85 @@ get_os_name() {
     os_name="$(uname -s 2>/dev/null)" || return 1
 
     echo "${os_name}"
+}
+
+##
+## @brief      Gets the available disk space.
+##
+## @param      $1    A file or directory that is part of the file system
+##                   of the disk for which the available space is to be
+##                   retrieved.
+##
+## @return     The available disk space in bytes.
+##
+get_available_disk_space() {
+    local -r file_or_directory="$1"
+    local -i available_kilobytes
+
+    is_not_empty "${file_or_directory}" || return 1
+
+    available_kilobytes="$(df -k "${file_or_directory}" | awk 'FNR==2 { printf("%s\n", $4) }')" || return 1
+
+    echo "$(( available_kilobytes * 1024 ))"
+}
+
+##
+## @brief      Gets the disk space used by a file or directory.
+##
+## @param      $1    A file or directory.
+##
+## @return     The disk space used by the file or directory in bytes.
+##
+get_disk_space_used_by_file_or_directory() {
+    local -r file_or_directory="$1"
+    local -i used_kilobytes
+
+    is_not_empty "${file_or_directory}" || return 1
+
+    used_kilobytes="$(du -s -k "${file_or_directory}" | awk '{ printf("%s\n", $1) }')" || return 1
+
+    echo "$(( used_kilobytes * 1024 ))"
+}
+
+##
+## @brief      Gets the volume name.
+##
+## @param      $1    A file or directory that is part of the file system
+##                   of the disk for which the volume name is to be
+##                   retrieved.
+##
+## @return     The volume name.
+##
+get_volume_name() {
+    local -r file_or_directory="$1"
+    local volume_name
+
+    is_not_empty "${file_or_directory}" || return 1
+
+    volume_name="$(df "${file_or_directory}" | awk 'FNR==2 { printf("%s\n", $9) }')" || return 1
+
+    if [[ "${volume_name}" == "/" ]]; then
+        volume_name="/Volumes/$(get_root_volume_name)" || return 1
+    fi
+
+    echo "${volume_name}"
+}
+
+##
+## @brief      Gets the root volume name.
+##
+## @return     The root volume name.
+##
+get_root_volume_name() {
+    local plist_file
+
+    is_not_empty "${global_tmp_directory-}" || return 1
+
+    plist_file="${global_tmp_directory}/DiskUtilInfoRoot.plist"
+
+    diskutil info -plist / >"${plist_file}" 2>/dev/null || return 1
+
+    get_plist_value ":VolumeName" "${plist_file}"
 }
 
 ##
@@ -1352,6 +1502,28 @@ get_installer_application_type()
 }
 
 ##
+## @brief      Gets the total non empty bytes of a disk image.
+##
+## @param      $1    The disk image.
+##
+## @return     The total number of non empty bytes.
+##
+get_disk_image_total_non_empty_bytes() {
+    local -r disk_image="$1"
+    local plist_file
+
+    is_not_empty "${disk_image}" || return 1
+    is_not_empty "${global_tmp_directory-}" || return 1
+
+    plist_file="${disk_image##*/}"
+    plist_file="${global_tmp_directory}/${plist_file%.*}ImageInfo.plist"
+
+    hdiutil imageinfo "${disk_image}" -plist >"${plist_file}" 2>/dev/null || return 1
+
+    get_plist_value ":Size Information:Total Non-Empty Bytes" "${plist_file}"
+}
+
+##
 ## @brief      Gets the 'short version string' of an installer
 ##             application.
 ##
@@ -1817,6 +1989,126 @@ script_hdiutil_makehybrid_canceled_by_sigquit() {
 }
 
 ##
+## @brief      Creates a human-readable byte size ready for output to
+##             the user. The size is returned rounded up to three
+##             decimals precision in units of Bytes, Kilobytes,
+##             Megabytes, Gigabytes, Terabytes, Petabytes or Exabytes.
+##             In case of a negative input value, the absolute value is
+##             used for calculation.
+##
+## @param      $1    The size in bytes.
+## @param      $2    Determines the rounding of the resulting three
+##                   digits. '1' for rounding up, '0' for rounding down.
+## @param      $3    The value for rounding up the provided number of
+##                   bytes.
+##
+## @return     A string containing the human-readable byte size.
+##
+create_human_readable_byte_size() {
+    local -i bytes="$1"
+    local -r -i number_to_add_for_rounding="$2"
+    local -r -i round_up_to_multiple_of_value="$3"
+    local -r -a units=("Bytes" "KB" "MB" "GB" "TB" "PB" "EB")
+    local -r -i max_power_of_thousand="$(( ${#units[@]} - 1 ))"
+    local -i number_of_digits
+    local -i power_of_thousand
+    local -i first_three_digits
+    local -i truncated_digits
+    local -i integer_part_number_of_digits
+    local -i integer_part
+    local fractional_part
+
+    # Use absolute value of bytes for further calculations
+    (( bytes = ${bytes//-/} ))
+
+    # Round up the bytes to a multiple of a defined value
+    (( bytes = (bytes / round_up_to_multiple_of_value + 1) * round_up_to_multiple_of_value ))
+
+    (( number_of_digits = ${#bytes} ))
+    (( power_of_thousand = (number_of_digits - 1) / 3 ))
+    (( first_three_digits = ${bytes:0:3} ))
+    (( truncated_digits = ${bytes:3} ))
+
+    if (( power_of_thousand > max_power_of_thousand )); then
+        (( power_of_thousand = max_power_of_thousand ))
+    fi
+
+    # Round up to three decimal places
+    if (( truncated_digits > 0 )); then
+        (( first_three_digits = first_three_digits + number_to_add_for_rounding ))
+    fi
+
+    (( integer_part_number_of_digits = number_of_digits - 3 * power_of_thousand ))
+    (( integer_part = ${first_three_digits:0:${integer_part_number_of_digits}} ))
+
+    # Add '0's to integer part if required
+    if (( integer_part_number_of_digits > 3 )); then
+        (( integer_part = "${integer_part}$(printf "0%.0s" $(seq 1 $(( integer_part_number_of_digits - 3 ))))" ))
+    fi
+
+    fractional_part="${first_three_digits:$(( integer_part_number_of_digits ))}"
+
+    echo "$(create_decimal_number "${integer_part}" "${fractional_part}") ${units[${power_of_thousand}]}"
+}
+
+##
+## @brief      Creates a decimal number from the integer and fractional
+##             part using the localized decimal separator. Trailing '0's
+##             in the fractional part will be removed.
+##
+## @param      $1    The integer part.
+## @param      $2    The fractional part.
+##
+## @return     The decimal number.
+##
+create_decimal_number() {
+    local -r -i integer_part="$1"
+    local fractional_part="$2"
+    local localized_decimal_separator
+    local decimal_number="${integer_part}"
+
+    # Retrieve the localized decimal separator by printing '0.0' and
+    # removing the '0's from the resulting string.
+    localized_decimal_separator="$(printf "%.1f\n" "0")"
+    localized_decimal_separator="${localized_decimal_separator//0/}"
+
+    # Remove trailing '0's from fractional part
+    fractional_part="${fractional_part%%0}"
+
+    if is_not_empty "${fractional_part}"; then
+        decimal_number="${decimal_number}${localized_decimal_separator}${fractional_part}"
+    fi
+
+    echo "${decimal_number}"
+}
+
+##
+## @brief      Determines whether both files or directories are on the
+##             same device.
+##
+## @param      $1       The 1st file or directory.
+## @param      $2       The 2nd file or directory.
+##
+## @retval     `true`   Both files or directories are on the same
+##                      device.
+## @retval     `false`  Otherwise.
+##
+are_one_same_device() {
+    local -r file_or_directory_1="$1"
+    local -r file_or_directory_2="$2"
+    local device_id_1
+    local device_id_2
+
+    # The 'stat' command must be called with the '-L' option so that the
+    # information reported by 'stat' refers to the target of the file,
+    # if the file is a symbolic link, and not to the file itself.
+    device_id_1="$(stat -L -f "%d" "${file_or_directory_1}")" || exit_with_status 240 "Couldn't get device ID."
+    device_id_2="$(stat -L -f "%d" "${file_or_directory_2}")" || exit_with_status 240 "Couldn't get device ID."
+
+    [[ "${device_id_1}" == "${device_id_2}" ]]
+}
+
+##
 ## @brief      Determines whether an installer application supports the
 ##             option `--applicationpath`.
 ##
@@ -1830,6 +2122,27 @@ has_applicationpath_option() {
     local -r installer_application_path="$1"
 
     "${installer_application_path}/Contents/Resources/createinstallmedia" 2>&1 | grep --regexp="--applicationpath" >/dev/null
+}
+
+##
+## @brief      Prints an error message about missing disk space and
+##             exits.
+##
+## @param      $1    The name of the volume on which there is
+##                   insufficient disk space.
+## @param      $2    The human-readable text for which the disk space is
+##                   needed.
+## @param      $3    The missing disk space in bytes.
+##
+exit_with_missing_disk_space() {
+    local -r volume_name="$1"
+    local -r human_readable_for_what="$2"
+    local -r -i missing_disk_space="$3"
+    local human_readable_missing_disk_space
+
+    human_readable_missing_disk_space="$(create_human_readable_byte_size "${missing_disk_space}" "1" "100000")"
+
+    exit_with_status 223 "${volume_name} is not large enough for ${human_readable_for_what}. An additional ${human_readable_missing_disk_space} is needed."
 }
 
 { main "$@"; } 102>&2 2>/dev/null
