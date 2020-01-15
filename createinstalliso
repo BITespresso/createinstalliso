@@ -533,7 +533,7 @@ main() {
 ## @param      $*    The argument(s).
 ##
 echo() {
-    IFS=' ' printf '%s\n' "$*"
+    IFS=' ' printf "%s\n" "$*"
 }
 
 ##
@@ -545,7 +545,7 @@ echo() {
 ## @param      $*    The argument(s).
 ##
 echo_n() {
-    IFS=' ' printf '%s' "$*"
+    IFS=' ' printf "%s" "$*"
 }
 
 ##
