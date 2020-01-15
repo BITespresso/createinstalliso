@@ -517,7 +517,7 @@ main() {
     create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 223 "Failed to create ISO image."
     unset global_incomplete_iso_target_image
 
-    echo "Install ISO image now available at \"${target_directory_path}/\""
+    echo "Installer ISO image now available at \"${target_directory_path}/\""
     exit_with_status 0
 }
 
