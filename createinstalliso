@@ -94,7 +94,7 @@ unset global_tmp_directory
 unset global_install_esd_mountpoint
 unset global_install_disk_mountpoint
 unset global_install_disk_device_node
-unset global_incomplete_iso_target_image
+unset global_incomplete_iso_destination_image
 
 # ======================================================================
 # Main function
@@ -142,7 +142,7 @@ main() {
     # ------------------------------------------------------------------
 
     unset option_applicationpath
-    unset option_targetdirectory
+    unset option_isodirectory
     local option_nointeraction="false"
 
     local long_option
@@ -192,9 +192,9 @@ main() {
                 option_applicationpath="${option_parameter}"
                 ;;
 
-            # Option '--targetdirectory'
-            -t* | --t* )
-                long_option="--targetdirectory"
+            # Option '--isodirectory'
+            -i* | --i* )
+                long_option="--isodirectory"
 
                 if is_option_including_option_parameter "$1"; then
                     if is_long_option "$1"; then
@@ -215,7 +215,7 @@ main() {
                     shift 2
                 fi
 
-                option_targetdirectory="${option_parameter}"
+                option_isodirectory="${option_parameter}"
                 ;;
 
             # Option '--nointeraction'
@@ -265,12 +265,12 @@ main() {
     # Verify command line options
     # ------------------------------------------------------------------
 
-    if [[ "${option_applicationpath+set}" != "set" || "${option_targetdirectory+set}" != "set" ]]; then
-        exit_with_status 255 "You must specify both the target directory and install application path."
+    if [[ "${option_applicationpath+set}" != "set" || "${option_isodirectory+set}" != "set" ]]; then
+        exit_with_status 255 "You must specify both the ISO directory and install application path."
     fi
 
-    if ! is_valid_target_directory_path "${option_targetdirectory}"; then
-        exit_with_status 254 "${option_targetdirectory} is not a valid target directory."
+    if ! is_valid_iso_directory_path "${option_isodirectory}"; then
+        exit_with_status 254 "${option_isodirectory} is not a valid ISO directory."
     fi
 
     if ! is_valid_installer_application_path "${option_applicationpath}"; then
@@ -282,18 +282,18 @@ main() {
     # ------------------------------------------------------------------
 
     local installer_application_path
-    local target_directory_path
+    local iso_directory_path
     local installer_application_display_name
     local -i installer_application_type
-    local iso_target_image
+    local iso_destination_image
     local random_string
 
     installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 244 "Couldn't get absolute path for ${option_applicationpath}."
-    target_directory_path="$(get_absolute_logical_path "${option_targetdirectory}")" || exit_with_status 243 "Couldn't get absolute path for ${option_targetdirectory}."
+    iso_directory_path="$(get_absolute_logical_path "${option_isodirectory}")" || exit_with_status 243 "Couldn't get absolute path for ${option_isodirectory}."
 
     installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application display name."
     installer_application_type="$(get_installer_application_type "${installer_application_path}")" || exit_with_status 241 "Couldn't get installer application type."
-    iso_target_image="${target_directory_path}/${installer_application_display_name}.iso"
+    iso_destination_image="${iso_directory_path}/${installer_application_display_name}.iso"
 
     global_tmp_directory="$(mktemp -d -t "${const_script_name}")" || exit_with_status 240 "Failed to create temporary directory."
     random_string="${global_tmp_directory##*.}"
@@ -332,25 +332,25 @@ main() {
     # Perform required user interactions
     # ------------------------------------------------------------------
 
-    local type_of_existing_target
+    local type_of_existing_destination
 
-    if is_existing "${iso_target_image}"; then
-        if is_file "${iso_target_image}"; then
-            type_of_existing_target="file"
+    if is_existing "${iso_destination_image}"; then
+        if is_file "${iso_destination_image}"; then
+            type_of_existing_destination="file"
         else
-            type_of_existing_target="directory"
+            type_of_existing_destination="directory"
         fi
 
         if [[ ! "${option_nointeraction}" == "true" ]]; then
             echo "Ready to start."
-            echo "To continue we need to delete the ${type_of_existing_target} ${iso_target_image}."
+            echo "To continue we need to delete the ${type_of_existing_destination} ${iso_destination_image}."
             if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
                 echo "Operation canceled."
                 exit_with_status 0
             fi
         fi
 
-        rm -rf "${iso_target_image}" >/dev/null || exit_with_status 237 "Failed to delete the ${type_of_existing_target} ${iso_target_image}."
+        rm -rf "${iso_destination_image}" >/dev/null || exit_with_status 237 "Failed to delete the ${type_of_existing_destination} ${iso_destination_image}."
     fi
 
     # ------------------------------------------------------------------
@@ -358,14 +358,14 @@ main() {
     # ------------------------------------------------------------------
 
     local -i available_in_global_tmp_directory
-    local -i available_in_target_directory_path
+    local -i available_in_iso_directory_path
     local -i required_in_global_tmp_directory
-    local -i required_in_target_directory_path
+    local -i required_in_iso_directory_path
     local -i missing_in_global_tmp_directory
-    local -i missing_in_target_directory_path
+    local -i missing_in_iso_directory_path
 
     available_in_global_tmp_directory="$(get_available_disk_space "${global_tmp_directory}")" || return 1
-    available_in_target_directory_path="$(get_available_disk_space "${target_directory_path}")" || return 1
+    available_in_iso_directory_path="$(get_available_disk_space "${iso_directory_path}")" || return 1
 
     case "${installer_application_type}" in
 
@@ -375,7 +375,7 @@ main() {
         1 )
             (( required_in_global_tmp_directory = 0 ))
 
-            (( required_in_target_directory_path = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
+            (( required_in_iso_directory_path = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
             ;;
 
         # Installer application type '2' for:
@@ -386,8 +386,8 @@ main() {
             (( required_in_global_tmp_directory = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
             (( required_in_global_tmp_directory = required_in_global_tmp_directory + (required_in_global_tmp_directory * 16 / 100) + 360000000 ))
 
-            (( required_in_target_directory_path = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
-            (( required_in_target_directory_path = required_in_target_directory_path + 1460000000 ))
+            (( required_in_iso_directory_path = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_in_iso_directory_path = required_in_iso_directory_path + 1460000000 ))
             ;;
 
         # Installer application type '3' for:
@@ -399,13 +399,13 @@ main() {
             (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
             (( required_in_global_tmp_directory = required_in_global_tmp_directory + 100000000 ))
 
-            (( required_in_target_directory_path = required_in_global_tmp_directory ))
+            (( required_in_iso_directory_path = required_in_global_tmp_directory ))
             ;;
 
     esac
 
-    if are_one_same_device "${global_tmp_directory}" "${target_directory_path}"; then
-        (( missing_in_global_tmp_directory = (required_in_global_tmp_directory + required_in_target_directory_path) - available_in_global_tmp_directory ))
+    if are_one_same_device "${global_tmp_directory}" "${iso_directory_path}"; then
+        (( missing_in_global_tmp_directory = (required_in_global_tmp_directory + required_in_iso_directory_path) - available_in_global_tmp_directory ))
 
         if (( missing_in_global_tmp_directory > 0 )); then
             exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files and installer ISO image" "${missing_in_global_tmp_directory}"
@@ -417,10 +417,10 @@ main() {
             exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files" "${missing_in_global_tmp_directory}"
         fi
 
-        (( missing_in_target_directory_path = required_in_target_directory_path - available_in_target_directory_path ))
+        (( missing_in_iso_directory_path = required_in_iso_directory_path - available_in_iso_directory_path ))
 
-        if (( missing_in_target_directory_path > 0 )); then
-            exit_with_missing_disk_space "$(get_volume_name "${target_directory_path}")" "installer ISO image" "${missing_in_target_directory_path}"
+        if (( missing_in_iso_directory_path > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${iso_directory_path}")" "installer ISO image" "${missing_in_iso_directory_path}"
         fi
     fi
 
@@ -513,11 +513,11 @@ main() {
     # Create ISO image
     # ------------------------------------------------------------------
 
-    global_incomplete_iso_target_image="${iso_target_image}"
-    create_iso_image "${iso_source_image}" "${iso_target_image}" "${installer_application_display_name}" || exit_with_status 223 "Failed to create ISO image."
-    unset global_incomplete_iso_target_image
+    global_incomplete_iso_destination_image="${iso_destination_image}"
+    create_iso_image "${iso_source_image}" "${iso_destination_image}" "${installer_application_display_name}" || exit_with_status 223 "Failed to create ISO image."
+    unset global_incomplete_iso_destination_image
 
-    echo "Installer ISO image now available at \"${target_directory_path}/\""
+    echo "Installer ISO image now available at \"${iso_directory_path}/\""
     exit_with_status 0
 }
 
@@ -938,8 +938,8 @@ cleanup() {
         rm -rf "${global_tmp_directory}" >/dev/null && unset global_tmp_directory
     fi
 
-    if is_not_empty "${global_incomplete_iso_target_image-}" && is_existing "${global_incomplete_iso_target_image}"; then
-        rm -rf "${global_incomplete_iso_target_image}" >/dev/null && unset global_incomplete_iso_target_image
+    if is_not_empty "${global_incomplete_iso_destination_image-}" && is_existing "${global_incomplete_iso_destination_image}"; then
+        rm -rf "${global_incomplete_iso_destination_image}" >/dev/null && unset global_incomplete_iso_destination_image
     fi
 }
 
@@ -1030,14 +1030,14 @@ print_error() {
 ## @brief      Prints the usage information.
 ##
 print_error_usage() {
-    print_error "Usage: ${const_script_name} --targetdirectory <path to target directory> --applicationpath <path to OS installer application> [--nointeraction]"
+    print_error "Usage: ${const_script_name} --isodirectory <path to ISO directory> --applicationpath <path to OS installer application> [--nointeraction]"
     print_error
     print_error "Arguments"
-    print_error "--targetdirectory, A path to a directory where the installer ISO image will be created."
+    print_error "--isodirectory, A path to a directory where the installer ISO image will be created."
     print_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
     print_error "--nointeraction, Delete an existing ISO image without prompting for confirmation."
     print_error
-    print_error "Example: ${const_script_name} --targetdirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
+    print_error "Example: ${const_script_name} --isodirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
 
     if ! is_root; then
         print_error
@@ -1280,19 +1280,19 @@ is_supported_macos_minor_version() {
 }
 
 ##
-## @brief      Determines whether a target directory path is valid.
+## @brief      Determines whether an ISO directory path is valid.
 ##
-## @param      $1       A target directory to be checked.
+## @param      $1       An ISO directory to be checked.
 ##
-## @retval     `true`   The target directory path is valid.
+## @retval     `true`   The ISO directory path is valid.
 ## @retval     `false`  Otherwise.
 ##
-is_valid_target_directory_path() {
-    local -r target_directory_path="$1"
+is_valid_iso_directory_path() {
+    local -r iso_directory_path="$1"
 
-    is_not_empty "${target_directory_path}" || return 1
+    is_not_empty "${iso_directory_path}" || return 1
 
-    is_directory "${target_directory_path}"
+    is_directory "${iso_directory_path}"
 }
 
 ##
@@ -1795,24 +1795,24 @@ script_createinstallmedia_canceled_by_sigquit() {
 ## @brief      Creates an ISO image file from a source image file.
 ##
 ## @param      $1    The source image file.
-## @param      $2    The target ISO image file.
+## @param      $2    The destination ISO image file.
 ## @param      $3    The default volume name for the ISO image.
 ##
 create_iso_image() {
     local -r iso_source_image="$1"
-    local -r iso_target_image="$2"
+    local -r iso_destination_image="$2"
     local -r default_volume_name="$3"
     local -r typescript_file="${global_tmp_directory}/typescript_hdiutil_makehybrid"
     local unused
     local -i exit_status
 
     is_not_empty "${iso_source_image}" || return 1
-    is_not_empty "${iso_target_image}" || return 1
+    is_not_empty "${iso_destination_image}" || return 1
     is_not_empty "${default_volume_name}" || return 1
 
     is_existing "${iso_source_image}" || return 1
 
-    { unused="$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_target_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2>/dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-)"; } 4>&1
+    { unused="$( { script -k -q "${typescript_file}" hdiutil makehybrid -o "${iso_destination_image}" "${iso_source_image}" -hfs -udf -default-volume-name "${default_volume_name}" 2>/dev/null > >(parse_create_iso_image); } 3>&1 >&4 4>&-)"; } 4>&1
     exit_status="$?"
 
     if script_hdiutil_makehybrid_canceled_by_sigint "${typescript_file}"; then
