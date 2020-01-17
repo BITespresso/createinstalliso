@@ -1033,9 +1033,9 @@ print_error_usage() {
     print_error "Usage: ${const_script_name} --isodirectory <path to ISO directory> --applicationpath <path to OS installer application> [--nointeraction]"
     print_error
     print_error "Arguments"
-    print_error "--isodirectory, A path to a directory where the installer ISO image will be created."
+    print_error "--isodirectory, A path to a directory where the installer ISO image file will be created."
     print_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
-    print_error "--nointeraction, Delete an existing ISO image without prompting for confirmation."
+    print_error "--nointeraction, Delete an existing ISO image file without prompting for confirmation."
     print_error
     print_error "Example: ${const_script_name} --isodirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
 
