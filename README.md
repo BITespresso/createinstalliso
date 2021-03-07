@@ -151,17 +151,17 @@ Apple has used different internal structures for its macOS installers over time.
 
 The known installer application types are:
 
-| Installer application for macOS version | Type |
-| --------------------------------------- | ---- |
-| Mac OS X Lion 10.7                      | 1    |
-| OS X Mountain Lion 10.8                 | 1    |
-| OS X Mavericks 10.9                     | 2    |
-| OS X Yosemite 10.10                     | 2    |
-| OS X El Capitan 10.11                   | 2    |
-| macOS Sierra 10.12                      | 3    |
-| macOS High Sierra 10.13                 | 3    |
-| macOS Mojave 10.14                      | 3    |
-| macOS Catalina 10.15                    | 3    |
+| Name                  | Version | Type |
+| --------------------- | ------- |:----:|
+| Mac OS X Lion         | 10.7    | 1    |
+| OS X Mountain Lion    | 10.8    | 1    |
+| OS X Mavericks        | 10.9    | 2    |
+| OS X Yosemite         | 10.10   | 2    |
+| OS X El Capitan       | 10.11   | 2    |
+| macOS Sierra          | 10.12   | 3    |
+| macOS High Sierra     | 10.13   | 3    |
+| macOS Mojave          | 10.14   | 3    |
+| macOS Catalina        | 10.15   | 3    |
 
 ### Required external commands
 
