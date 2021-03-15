@@ -740,7 +740,32 @@ is_array_item() {
     local current_item
 
     for current_item in "${!array_name}"; do
-        if [[ "${current_item}" == "${item}" ]]; then
+        if [[ "${item}" == "${current_item}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+##
+## @brief      Determines whether an item matches a regex expression in
+##             an array. The array is passed to the function by
+##             reference via its name.
+##
+## @param      $1       An item.
+## @param      $2       The name of the array as string.
+##
+## @retval     `true`   The item matches a regex expression in the
+##                      array.
+## @retval     `false`  Otherwise.
+##
+matches_array_item_regex() {
+    local -r item="$1"
+    local -r array_name="$2[@]"
+    local current_item_regex
+
+    for current_item_regex in "${!array_name}"; do
+        if [[ "${item}" =~ ${current_item_regex} ]]; then
             return 0
         fi
     done
