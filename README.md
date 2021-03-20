@@ -61,6 +61,7 @@ The table below shows:
 | macOS High Sierra     | 10.13   | Yes                          | Yes                   |
 | macOS Mojave          | 10.14   | Yes                          | Yes                   |
 | macOS Catalina        | 10.15   | Yes                          | Yes                   |
+| macOS Big Sur         | 11      | Yes                          | Yes                   |
 
 **Note:** You can use *any* of the compatible macOS versions to create an ISO image from *any* of the compatible installer applications.
 
@@ -162,6 +163,7 @@ The known installer application types are:
 | macOS High Sierra     | 10.13   | 3    |
 | macOS Mojave          | 10.14   | 3    |
 | macOS Catalina        | 10.15   | 3    |
+| macOS Big Sur         | 11      | 4    |
 
 ### Required external commands
 

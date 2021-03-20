@@ -27,6 +27,7 @@ fi
 # ======================================================================
 
 declare -r const_script_name="createinstalliso"
+declare -r const_minimum_required_macos_version_string="10.6"
 declare -r -i const_root_uid=0
 
 # This script requires /usr/libexec/PlistBuddy to read values from
@@ -34,27 +35,28 @@ declare -r -i const_root_uid=0
 # or later. However on Mac OS X 10.5 Leopard PlistBuddy does not handle
 # large integer values correctly. Therefore, this script requires
 # Mac OS X 10.6 Snow Leopard or later.
-declare -r -a const_unsupported_macos_minor_versions=(
-    "0"  # Mac OS X Cheetah      10.0
-    "1"  # Mac OS X Puma         10.1
-    "2"  # Mac OS X Jaguar       10.2
-    "3"  # Mac OS X Panther      10.3
-    "4"  # Mac OS X Tiger        10.4
-    "5"  # Mac OS X Leopard      10.5
+declare -r -a const_unsupported_macos_version_strings_regex=(
+    '^10\.0(\.[[:digit:]+])?$'            # Mac OS X Cheetah      10.0
+    '^10\.1(\.[[:digit:]+])?$'            # Mac OS X Puma         10.1
+    '^10\.2(\.[[:digit:]+])?$'            # Mac OS X Jaguar       10.2
+    '^10\.3(\.[[:digit:]+])?$'            # Mac OS X Panther      10.3
+    '^10\.4(\.[[:digit:]+])?$'            # Mac OS X Tiger        10.4
+    '^10\.5(\.[[:digit:]+])?$'            # Mac OS X Leopard      10.5
 )
 
 # This script has been tested on the following macOS versions.
-declare -r -a const_supported_macos_minor_versions=(
-    "6"  # Mac OS X Snow Leopard 10.6
-    "7"  # Mac OS X Lion         10.7
-    "8"  # OS X Mountain Lion    10.8
-    "9"  # OS X Mavericks        10.9
-    "10" # OS X Yosemite         10.10
-    "11" # OS X El Capitan       10.11
-    "12" # macOS Sierra          10.12
-    "13" # macOS High Sierra     10.13
-    "14" # macOS Mojave          10.14
-    "15" # macOS Catalina        10.15
+declare -r -a const_supported_macos_version_strings_regex=(
+    '^10\.6(\.[[:digit:]+])?$'            # Mac OS X Snow Leopard 10.6
+    '^10\.7(\.[[:digit:]+])?$'            # Mac OS X Lion         10.7
+    '^10\.8(\.[[:digit:]+])?$'            # OS X Mountain Lion    10.8
+    '^10\.9(\.[[:digit:]+])?$'            # OS X Mavericks        10.9
+    '^10\.10(\.[[:digit:]+])?$'           # OS X Yosemite         10.10
+    '^10\.11(\.[[:digit:]+])?$'           # OS X El Capitan       10.11
+    '^10\.12(\.[[:digit:]+])?$'           # macOS Sierra          10.12
+    '^10\.13(\.[[:digit:]+])?$'           # macOS High Sierra     10.13
+    '^10\.14(\.[[:digit:]+])?$'           # macOS Mojave          10.14
+    '^10\.15(\.[[:digit:]+])?$'           # macOS Catalina        10.15
+    '^11\.[[:digit:]]+(\.[[:digit:]+])?$' # macOS Big Sur         11
 )
 
 # This script has been tested with the following installer applications.
@@ -68,27 +70,35 @@ declare -r -a const_supported_installer_application_display_names=(
     "Install macOS High Sierra"  # 10.13
     "Install macOS Mojave"       # 10.14
     "Install macOS Catalina"     # 10.15
+    "Install macOS Big Sur"      # 11
 )
 
-# List of all known macOS version names.
-declare -r -a const_macos_names=(
-    "Mac OS X Cheetah"      # 10.0
-    "Mac OS X Puma"         # 10.1
-    "Mac OS X Jaguar"       # 10.2
-    "Mac OS X Panther"      # 10.3
-    "Mac OS X Tiger"        # 10.4
-    "Mac OS X Leopard"      # 10.5
-    "Mac OS X Snow Leopard" # 10.6
-    "Mac OS X Lion"         # 10.7
-    "OS X Mountain Lion"    # 10.8
-    "OS X Mavericks"        # 10.9
-    "OS X Yosemite"         # 10.10
-    "OS X El Capitan"       # 10.11
-    "macOS Sierra"          # 10.12
-    "macOS High Sierra"     # 10.13
-    "macOS Mojave"          # 10.14
-    "macOS Catalina"        # 10.15
+# List of all known macOS version names and their corresponding version
+# string regex. The regex expression and the macOS version name must
+# be separated by the '#' character.
+declare -r -a const_known_macos_names_and_version_strings_regex=(
+    '^10\.0.*$  # Mac OS X Cheetah'      # 10.0
+    '^10\.1.*$  # Mac OS X Puma'         # 10.1
+    '^10\.2.*$  # Mac OS X Jaguar'       # 10.2
+    '^10\.3.*$  # Mac OS X Panther'      # 10.3
+    '^10\.4.*$  # Mac OS X Tiger'        # 10.4
+    '^10\.5.*$  # Mac OS X Leopard'      # 10.5
+    '^10\.6.*$  # Mac OS X Snow Leopard' # 10.6
+    '^10\.7.*$  # Mac OS X Lion'         # 10.7
+    '^10\.8.*$  # OS X Mountain Lion'    # 10.8
+    '^10\.9.*$  # OS X Mavericks'        # 10.9
+    '^10\.10.*$ # OS X Yosemite'         # 10.10
+    '^10\.11.*$ # OS X El Capitan'       # 10.11
+    '^10\.12.*$ # macOS Sierra'          # 10.12
+    '^10\.13.*$ # macOS High Sierra'     # 10.13
+    '^10\.14.*$ # macOS Mojave'          # 10.14
+    '^10\.15.*$ # macOS Catalina'        # 10.15
+    '^11\..*$   # macOS Big Sur'         # 11
 )
+
+# Make sure that macOS Big Sur reports 11 as the macOS version instead
+# of 10.16.
+unset SYSTEM_VERSION_COMPAT
 
 unset global_tmp_directory
 unset global_install_esd_mountpoint
@@ -127,13 +137,13 @@ main() {
     macos_patch_version="${macos_version[2]:-0}"
     (( macos_version_for_compare = (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))
 
-    if is_unsupported_macos_minor_version "${macos_minor_version}"; then
-        macos_name_and_version="$(create_macos_name_and_version "${const_supported_macos_minor_versions[0]}")" || exit_with_status 247 "Invalid macOS version."
+    if is_unsupported_macos_version_string "${macos_version_string}"; then
+        macos_name_and_version="$(create_macos_name_and_version "${const_minimum_required_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
         exit_with_status 245 "This tool requires ${macos_name_and_version} or later."
     fi
 
-    if ! is_supported_macos_minor_version "${macos_minor_version}"; then
-        macos_name_and_version="$(create_macos_name_and_version "${macos_minor_version}" "${macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
+    if ! is_supported_macos_version_string "${macos_version_string}"; then
+        macos_name_and_version="$(create_macos_name_and_version "${macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
         print_warning "This tool has not been tested on ${macos_name_and_version}."
     fi
 
@@ -323,7 +333,7 @@ main() {
         (( installer_minimum_macos_version_for_compare = (installer_minimum_macos_major_version * 10000) + (installer_minimum_macos_minor_version * 100) + installer_minimum_macos_patch_version ))
 
         if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
-            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_minor_version}" "${installer_minimum_macos_patch_version}")" || exit_with_status 247 "Invalid macOS version."
+            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
             exit_with_status 238 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
         fi
     fi
@@ -398,6 +408,15 @@ main() {
         3 )
             (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
             (( required_in_global_tmp_directory = required_in_global_tmp_directory + 100000000 ))
+
+            (( required_in_iso_directory_path = required_in_global_tmp_directory ))
+            ;;
+
+        # Installer application type '4' for:
+        # - macOS Big Sur 11
+        4 )
+            (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_in_global_tmp_directory = required_in_global_tmp_directory + 800000000 ))
 
             (( required_in_iso_directory_path = required_in_global_tmp_directory ))
             ;;
@@ -492,7 +511,9 @@ main() {
         # - macOS High Sierra 10.13
         # - macOS Mojave 10.14
         # - macOS Catalina 10.15
-        3 )
+        # Installer application type '4' for:
+        # - macOS Big Sur 11
+        3 | 4 )
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
             install_disk_volname="InstallMedia.${random_string}"
@@ -1283,10 +1304,10 @@ exit_ambiguous_long_option() {
 ## @retval     `true`   The macOS version is unsupported.
 ## @retval     `false`  Otherwise.
 ##
-is_unsupported_macos_minor_version() {
-    local -r macos_minor_version="$1"
+is_unsupported_macos_version_string() {
+    local -r macos_version_string="$1"
 
-    is_array_item "${macos_minor_version}" "const_unsupported_macos_minor_versions"
+    matches_array_item_regex "${macos_version_string}" "const_unsupported_macos_version_strings_regex"
 }
 
 ##
@@ -1298,10 +1319,10 @@ is_unsupported_macos_minor_version() {
 ## @retval     `true`   The macOS version is supported.
 ## @retval     `false`  Otherwise.
 ##
-is_supported_macos_minor_version() {
-    local -r macos_minor_version="$1"
+is_supported_macos_version_string() {
+    local -r macos_version_string="$1"
 
-    is_array_item "${macos_minor_version}" "const_supported_macos_minor_versions"
+    matches_array_item_regex "${macos_version_string}" "const_supported_macos_version_strings_regex"
 }
 
 ##
@@ -1389,11 +1410,11 @@ is_valid_installer_application_path() {
             is_file "${installer_application_path}/Contents/SharedSupport/OSInstall.mpkg" || return 1
 
             if is_file "${installer_application_path}/Contents/Info.plist"; then
-                installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
-                [[ "${installer_application_short_version_string}" =~ ${valid_installer_application_short_version_string_regex} ]] || return 1
-
                 installer_application_identifier="$(get_installer_application_identifier "${installer_application_path}")" || return 1
                 [[ "${installer_application_identifier}" =~ ${valid_installer_application_identifier_regex} ]] || return 1
+
+                installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
+                [[ "${installer_application_short_version_string}" =~ ${valid_installer_application_short_version_string_regex} ]] || return 1
             else
                 return 1
             fi
@@ -1415,11 +1436,11 @@ is_valid_installer_application_path() {
             # Apple's command 'createinstallmedia' to determine if the
             # OS installer application is valid.
             if is_file "${installer_application_path}/Contents/Info.plist"; then
-                installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
-                [[ "${installer_application_short_version_string}" =~ ${valid_installer_application_short_version_string_regex} ]] || return 1
-
                 installer_application_identifier="$(get_installer_application_identifier "${installer_application_path}")" || return 1
                 [[ "${installer_application_identifier}" =~ ${valid_installer_application_identifier_regex} ]] || return 1
+
+                installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
+                [[ "${installer_application_short_version_string}" =~ ${valid_installer_application_short_version_string_regex} ]] || return 1
             else
                 return 1
             fi
@@ -1430,6 +1451,28 @@ is_valid_installer_application_path() {
             else
                 return 1
             fi
+
+            return 0
+            ;;
+
+        # Installer application type '4' for:
+        # - macOS Big Sur 11
+        4 )
+            # Apple's command 'createinstallmedia' is required because
+            # it will be used to create the installer disk image.
+            is_file "${installer_application_path}/Contents/Resources/createinstallmedia" || return 1
+
+            # All subsequent checks are the same as those performed by
+            # Apple's command 'createinstallmedia' to determine if the
+            # OS installer application is valid.
+            if is_file "${installer_application_path}/Contents/Info.plist"; then
+                installer_application_identifier="$(get_installer_application_identifier "${installer_application_path}")" || return 1
+                [[ "${installer_application_identifier}" =~ ${valid_installer_application_identifier_regex} ]] || return 1
+            else
+                return 1
+            fi
+
+            is_file "${installer_application_path}/Contents/SharedSupport/SharedSupport.dmg" || return 1
 
             return 0
             ;;
@@ -1495,6 +1538,8 @@ get_installer_application_display_name() {
 ##               - macOS High Sierra 10.13
 ##               - macOS Mojave 10.14
 ##               - macOS Catalina 10.15
+##             * Installer application type '4' for:
+##               - macOS Big Sur 11
 ##
 ## @param      $1    The path to an installer application.
 ##
@@ -1516,7 +1561,11 @@ get_installer_application_type()
             if is_file "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"; then
                 installer_application_type=3
             else
-                installer_application_type=2
+                if is_file "${installer_application_path}/Contents/SharedSupport/SharedSupport.dmg"; then
+                    installer_application_type=4
+                else
+                    installer_application_type=2
+                fi
             fi
         else
             installer_application_type=1
@@ -1602,36 +1651,33 @@ get_system_image_url()
 ## @brief      Creates a macOS name and version string for output to the
 ##             user.
 ##
-## @param      $1    A macOS minor version number (e.g. '12').
-## @param      $2    A macOS patch version number (e.g. '2').
+## @param      $1    A macOS version as string (e.g. '10.12.2').
 ##
 ## @return     The macOS version name and version number as string (e.g.
 ##             'macOS Sierra 10.12.2').
 ##
 create_macos_name_and_version() {
-    local -r -i macos_minor_version="${1:-0}"
-    local -r -i macos_patch_version="${2:-0}"
-    local -i largest_known_macos_minor_version="${#const_macos_names[@]}"
+    local -r macos_version_string="$1"
+    local current_item
+    local current_item_regex
+    local current_item_name
     local macos_name="macOS"
-    local macos_version
 
-    (( --largest_known_macos_minor_version ))
+    for current_item in "${const_known_macos_names_and_version_strings_regex[@]}"; do
 
-    if (( (macos_minor_version < 0) || (macos_patch_version < 0) )); then
-        return 1
-    fi
+        # Split the item at '#' and trim both sides
+        current_item_regex="${current_item%%#*}"
+        current_item_regex="$(trim "${current_item_regex}")"
 
-    if (( macos_minor_version <= largest_known_macos_minor_version )); then
-        macos_name="${const_macos_names[${macos_minor_version}]}"
-    fi
+        current_item_name="${current_item#*#}"
+        current_item_name="$(trim "${current_item_name}")"
 
-    if (( macos_patch_version > 0 )); then
-        macos_version="10.${macos_minor_version}.${macos_patch_version}"
-    else
-        macos_version="10.${macos_minor_version}"
-    fi
+        if [[ "${macos_version_string}" =~ ${current_item_regex} ]]; then
+            macos_name="${current_item_name}"
+        fi
+    done
 
-    echo "${macos_name} ${macos_version}"
+    echo "${macos_name} ${macos_version_string}"
 }
 
 ##
