@@ -907,19 +907,15 @@ trim() {
 ##
 set_shell_options() {
     set -o errexit
-    set -o errtrace
     set -o nounset
     set -o pipefail
 }
 
 ##
-## @brief      Resets the shell options.
+## @brief      Sets the shell options for exit.
 ##
-reset_shell_options() {
+set_shell_options_for_exit() {
     set +o errexit
-    set +o errtrace
-    set +o nounset
-    set +o pipefail
 }
 
 ##
@@ -944,7 +940,7 @@ set_traps() {
 ## @brief      Handles the 'EXIT' pseudo-signal.
 ##
 exit_handler() {
-    reset_shell_options
+    set_shell_options_for_exit
     trap - EXIT
     cleanup
 }
@@ -960,7 +956,7 @@ signal_handler() {
     local -r -i min_signal_number=1
     local -r -i max_signal_number=31
 
-    reset_shell_options
+    set_shell_options_for_exit
     trap - EXIT
     cleanup
 
