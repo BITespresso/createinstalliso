@@ -1925,7 +1925,7 @@ parse_create_iso_image() {
     local is_line_mute="false"
     local is_mute="false"
     local is_progress_line="false"
-    local -r shell_columns="$(tput cols)"
+    local -r shell_columns="$(tput cols 2>/dev/tty)"
     local -r -i dot_count_max="$(( shell_columns - 2 ))"
     local -i dot_count=0
     local -i dot_increment
