@@ -121,21 +121,14 @@ main() {
     local os_name
 
     local macos_version_string
-    local -i -a macos_version
-    local -i macos_major_version
-    local -i macos_minor_version
-    local -i macos_patch_version
     local -i macos_version_for_compare
     local macos_name_and_version
 
     os_name="$(get_os_name)" || exit_with_status 251 "Couldn't get operating system name."
     is_macos "${os_name}" || exit_with_status 250 "This tool must be run on macOS."
 
-    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" && IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || exit_with_status 248 "Couldn't get macOS version."
-    macos_major_version="${macos_version[0]:-0}"
-    macos_minor_version="${macos_version[1]:-0}"
-    macos_patch_version="${macos_version[2]:-0}"
-    (( macos_version_for_compare = (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))
+    macos_version_string="$(sw_vers -productVersion 2>/dev/null)" || exit_with_status 248 "Couldn't get macOS version."
+    macos_version_for_compare="$(create_macos_version_for_compare "${macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
 
     if is_unsupported_macos_version_string "${macos_version_string}"; then
         macos_name_and_version="$(create_macos_name_and_version "${const_minimum_required_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
@@ -313,10 +306,6 @@ main() {
     # ------------------------------------------------------------------
 
     local installer_minimum_macos_version_string
-    local -i -a installer_minimum_macos_version
-    local -i installer_minimum_macos_major_version
-    local -i installer_minimum_macos_minor_version
-    local -i installer_minimum_macos_patch_version
     local -i installer_minimum_macos_version_for_compare
 
     if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
@@ -326,11 +315,8 @@ main() {
     # An installer application type '3' requires OS X Mountain Lion 10.8
     # or higher to run 'createinstallmedia'.
     if [[ "${installer_application_type}" == 3 ]]; then
-        installer_minimum_macos_version_string="10.8" && IFS='.' read -r -a installer_minimum_macos_version < <(echo "${installer_minimum_macos_version_string}")
-        installer_minimum_macos_major_version="${installer_minimum_macos_version[0]:-0}"
-        installer_minimum_macos_minor_version="${installer_minimum_macos_version[1]:-0}"
-        installer_minimum_macos_patch_version="${installer_minimum_macos_version[2]:-0}"
-        (( installer_minimum_macos_version_for_compare = (installer_minimum_macos_major_version * 10000) + (installer_minimum_macos_minor_version * 100) + installer_minimum_macos_patch_version ))
+        installer_minimum_macos_version_string="10.8"
+        installer_minimum_macos_version_for_compare="$(create_macos_version_for_compare "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
 
         if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
             macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
@@ -1641,6 +1627,28 @@ get_system_image_url()
     is_not_empty "${installer_application_path}" || return 1
 
     get_plist_value ":System Image Info:URL" "${installer_application_path}/Contents/SharedSupport/InstallInfo.plist"
+}
+
+##
+## @brief      Creates a numeric version number from a macOS version
+##             string which can be used with numeric comparisons
+##             operators.
+##
+## @param      $1    A macOS version as string (e.g. '10.12.2').
+##
+create_macos_version_for_compare() {
+    local -r macos_version_string="$1"
+    local -i -a macos_version
+    local -i macos_major_version
+    local -i macos_minor_version
+    local -i macos_patch_version
+
+    IFS='.' read -r -a macos_version < <(echo "${macos_version_string}")
+    macos_major_version="${macos_version[0]:-0}"
+    macos_minor_version="${macos_version[1]:-0}"
+    macos_patch_version="${macos_version[2]:-0}"
+
+    echo "$(( (macos_major_version * 10000) + (macos_minor_version * 100) + macos_patch_version ))"
 }
 
 ##
