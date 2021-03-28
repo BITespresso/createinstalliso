@@ -13,7 +13,7 @@ Creates a bootable ISO image from a macOS installer application. This image can 
     2. [Command Line Arguments](#user-content-command-line-arguments)
 6. [Troubleshooting](#user-content-troubleshooting)
     1. [Alert: This copy of the Install ... can't ...](#user-content-alert-this-copy-of-the-install--cant-)
-    2. [Error message: ... is not a valid volume mount point.](#user-content-error-message--is-not-a-valid-volume-mount-point)
+    2. [Error message: ... contains a broken createinstallmedia command.](#user-content-error-message--contains-a-broken-createinstallmedia-command)
 7. [References](#user-content-references)
     1. [Installer Application Types](#user-content-installer-application-types)
     2. [Required external commands](#user-content-required-external-commands)
@@ -131,14 +131,9 @@ But unfortunately there is a bug in the **updated** installer for **macOS Sierra
 * In the terminal window type `date 071900002017`. This sets the system date to July 19, 2017, 0:00 am, the release date of macOS Sierra.
 * Quit the terminal window and resume the installation of macOS Sierra.
 
-### Error message: ... is not a valid volume mount point.
+### Error message: ... contains a broken createinstallmedia command.
 
-If **createinstalliso** terminates with an error message like the one below, you are probably using the *newer* **macOS Sierra** installer like the one in: [How to upgrade to macOS Sierra](https://support.apple.com/en-us/HT208202)
-
-```
-/Volumes/InstallMedia.zLKSWWDf is not a valid volume mount point.
-Failed to convert disk image into bootable install media.
-```
+If **createinstalliso** terminates with the error message `... contains a broken createinstallmedia command.` you are using the *newer* **macOS Sierra** installer like the one in: [How to upgrade to macOS Sierra](https://support.apple.com/en-us/HT208202)
 
 While this *newer* installer application for macOS Sierra contains updated certificates (see: "[Alert: This copy of the Install ... can't ...](#user-content-alert-this-copy-of-the-install--cant-)"), it unfortunately introduced a bug that makes the included `createinstallmedia` command useless because it **always** complains about the mount point. Since `createinstallmedia` is used internally by **createinstalliso**, it is not possible to use this *newer* version of the macOS Sierra installer application.
 
@@ -218,6 +213,7 @@ The table below lists all possible exit status and corresponding messages:
 | 225    | Failed to create disk image.                                                          |
 | 224    | Failed to convert disk image into bootable install media.                             |
 | 223    | Failed to create ISO image.                                                           |
+| 222    | \[FILE\] contains a broken createinstallmedia command.                                |
 
 ## License
 

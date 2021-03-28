@@ -302,6 +302,14 @@ main() {
     random_string="${global_tmp_directory##*.}"
 
     # ------------------------------------------------------------------
+    # Check for invalid macOS Sierra installer application
+    # ------------------------------------------------------------------
+
+    if [[ "${installer_application_display_name}" == "Install macOS Sierra" ]] && is_invalid_macos_sierra_installer_application "${option_applicationpath}"; then
+        exit_with_status 222 "${option_applicationpath} contains a broken 'createinstallmedia' command."
+    fi
+
+    # ------------------------------------------------------------------
     # Check installer application requirements
     # ------------------------------------------------------------------
 
@@ -1471,6 +1479,25 @@ is_valid_installer_application_path() {
     esac
 
     return 1
+}
+
+##
+## @brief      Determines whether the installer application is a macOS
+##             Sierra installer application version which contains a
+##             broken 'createinstallmedia' command.
+##
+## @param      $1       An installer application path to be checked.
+##
+## @retval     `true`   Invalid macOS Sierra installer application.
+## @retval     `false`  Otherwise.
+##
+is_invalid_macos_sierra_installer_application() {
+    local -r installer_application_path="$1"
+    local installer_application_short_version_string
+
+    installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 0
+
+    [[ "${installer_application_short_version_string}" == "12.6.06" ]]
 }
 
 ##
