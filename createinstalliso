@@ -1652,7 +1652,7 @@ create_macos_version_for_compare() {
     local -i macos_minor_version
     local -i macos_patch_version
 
-    IFS='.' read -r -a macos_version < <(echo "${macos_version_string}")
+    IFS='.' read -r -a macos_version < <(echo "${macos_version_string}") || return 1
     macos_major_version="${macos_version[0]:-0}"
     macos_minor_version="${macos_version[1]:-0}"
     macos_patch_version="${macos_version[2]:-0}"
