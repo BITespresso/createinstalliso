@@ -49,19 +49,19 @@ The table below shows:
 * If a macOS version can be used to *run* **createinstalliso**.
 * If the installer application for a macOS version can be *used* by **createinstalliso** to create an ISO image.
 
-| Name                  | Version | Can run **createinstalliso** | Installer can be used |
-| --------------------- | ------- |:----------------------------:|:---------------------:|
-| Mac OS X Snow Leopard | 10.6    | Yes                          | No                    |
-| Mac OS X Lion         | 10.7    | Yes                          | Yes                   |
-| OS X Mountain Lion    | 10.8    | Yes                          | Yes                   |
-| OS X Mavericks        | 10.9    | Yes                          | Yes                   |
-| OS X Yosemite         | 10.10   | Yes                          | Yes                   |
-| OS X El Capitan       | 10.11   | Yes                          | Yes                   |
-| macOS Sierra          | 10.12   | Yes                          | Yes                   |
-| macOS High Sierra     | 10.13   | Yes                          | Yes                   |
-| macOS Mojave          | 10.14   | Yes                          | Yes                   |
-| macOS Catalina        | 10.15   | Yes                          | Yes                   |
-| macOS Big Sur         | 11      | Yes                          | Yes                   |
+| Name                  | Version | Installer can be used | Can run **createinstalliso** |
+| --------------------- | ------- |:---------------------:|:----------------------------:|
+| Mac OS X Snow Leopard | 10.6    | No                    | Yes                          |
+| Mac OS X Lion         | 10.7    | Yes                   | Yes                          |
+| OS X Mountain Lion    | 10.8    | Yes                   | Yes                          |
+| OS X Mavericks        | 10.9    | Yes                   | Yes                          |
+| OS X Yosemite         | 10.10   | Yes                   | Yes                          |
+| OS X El Capitan       | 10.11   | Yes                   | Yes                          |
+| macOS Sierra          | 10.12   | Yes                   | Yes                          |
+| macOS High Sierra     | 10.13   | Yes                   | Yes                          |
+| macOS Mojave          | 10.14   | Yes                   | Yes                          |
+| macOS Catalina        | 10.15   | Yes                   | Yes                          |
+| macOS Big Sur         | 11      | Yes                   | Yes                          |
 
 **Note:** You can use *any* of the compatible macOS versions to create an ISO image from *any* of the compatible installer applications.
 
