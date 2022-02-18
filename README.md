@@ -70,7 +70,7 @@ The table below shows:
 * Open Terminal, which is in the Utilities folder of your Applications folder and type or paste the following commands in Terminal.
 * Download the **createinstalliso** file.
     ```
-    curl -fOSs https://raw.githubusercontent.com/BITespresso/createinstalliso-bash/master/createinstalliso
+    curl -fOSs https://raw.githubusercontent.com/BITespresso/createinstalliso/master/createinstalliso
     ```
 * Make the downloaded script executable.
     ```
