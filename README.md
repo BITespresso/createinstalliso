@@ -44,26 +44,64 @@ To run **createinstalliso** you need:
 
 ## Compatibility
 
+### macOS version
+
 The table below shows:
 
-* If a macOS version can be used to *run* **createinstalliso**.
-* If the installer application for a macOS version can be *used* by **createinstalliso** to create an ISO image.
+* Whether a macOS version can run **createinstalliso**.
+* Which installer applications can be used with this particular macOS version.
 
-| Name                  | Version | Installer can be used | Can run **createinstalliso** |
-| --------------------- | ------- |:---------------------:|:----------------------------:|
-| Mac OS X Snow Leopard | 10.6    | No                    | Yes                          |
-| Mac OS X Lion         | 10.7    | Yes                   | Yes                          |
-| OS X Mountain Lion    | 10.8    | Yes                   | Yes                          |
-| OS X Mavericks        | 10.9    | Yes                   | Yes                          |
-| OS X Yosemite         | 10.10   | Yes                   | Yes                          |
-| OS X El Capitan       | 10.11   | Yes                   | Yes                          |
-| macOS Sierra          | 10.12   | Yes                   | Yes                          |
-| macOS High Sierra     | 10.13   | Yes                   | Yes                          |
-| macOS Mojave          | 10.14   | Yes                   | Yes                          |
-| macOS Catalina        | 10.15   | Yes                   | Yes                          |
-| macOS Big Sur         | 11      | Yes                   | Yes                          |
+| macOS                 | Version | Can run **createinstalliso** | Can use installer for |
+| --------------------- | ------- |:----------------------------:| --------------------- |
+| Mac OS X Cheetah      | 10.0    | No                           | -                     |
+| Mac OS X Puma         | 10.1    | No                           | -                     |
+| Mac OS X Jaguar       | 10.2    | No                           | -                     |
+| Mac OS X Panther      | 10.3    | No                           | -                     |
+| Mac OS X Tiger        | 10.4    | No                           | -                     |
+| Mac OS X Leopard      | 10.5    | No                           | -                     |
+| Mac OS X Snow Leopard | 10.6    | Yes                          | 10.7 - 10.11          |
+| Mac OS X Lion         | 10.7    | Yes                          | 10.7 - 10.11          |
+| OS X Mountain Lion    | 10.8    | Yes                          | 10.7 - 10.15          |
+| OS X Mavericks        | 10.9    | Yes                          | 10.7 - 12             |
+| OS X Yosemite         | 10.10   | Yes                          | 10.7 - 12             |
+| OS X El Capitan       | 10.11   | Yes                          | 10.7 - 13             |
+| macOS Sierra          | 10.12   | Yes                          | 10.7 - 13             |
+| macOS High Sierra     | 10.13   | Yes                          | 10.7 - 14             |
+| macOS Mojave          | 10.14   | Yes                          | 10.7 - 14             |
+| macOS Catalina        | 10.15   | Yes                          | 10.7 - 14             |
+| macOS Big Sur         | 11      | Yes                          | 10.7 - 14             |
+| macOS Monterey        | 12      | Yes                          | 10.7 - 14             |
+| macOS Ventura         | 13      | Yes                          | 10.7 - 14             |
+| macOS Sonoma          | 14      | Yes                          | 10.7 - 14             |
 
-**Note:** You can use *any* of the compatible macOS versions to create an ISO image from *any* of the compatible installer applications.
+### Installer version
+
+The table below shows:
+
+* Which macOS version is required to use **createinstalliso** with this particular installer.
+
+| Installer for         | Version | Required macOS version |
+| --------------------- | ------- |:----------------------:|
+| Mac OS X Cheetah      | 10.0    | -                      |
+| Mac OS X Puma         | 10.1    | -                      |
+| Mac OS X Jaguar       | 10.2    | -                      |
+| Mac OS X Panther      | 10.3    | -                      |
+| Mac OS X Tiger        | 10.4    | -                      |
+| Mac OS X Leopard      | 10.5    | -                      |
+| Mac OS X Snow Leopard | 10.6    | -                      |
+| Mac OS X Lion         | 10.7    | 10.6 or later          |
+| OS X Mountain Lion    | 10.8    | 10.6 or later          |
+| OS X Mavericks        | 10.9    | 10.6 or later          |
+| OS X Yosemite         | 10.10   | 10.6 or later          |
+| OS X El Capitan       | 10.11   | 10.6 or later          |
+| macOS Sierra          | 10.12   | 10.8 or later          |
+| macOS High Sierra     | 10.13   | 10.8 or later          |
+| macOS Mojave          | 10.14   | 10.8 or later          |
+| macOS Catalina        | 10.15   | 10.8 or later          |
+| macOS Big Sur         | 11      | 10.9 or later          |
+| macOS Monterey        | 12      | 10.9 or later          |
+| macOS Ventura         | 13      | 10.11 or later         |
+| macOS Sonoma          | 14      | 10.13 or later         |
 
 ## Installation
 
@@ -159,6 +197,9 @@ The known installer application types are:
 | macOS Mojave          | 10.14   | 3    |
 | macOS Catalina        | 10.15   | 3    |
 | macOS Big Sur         | 11      | 4    |
+| macOS Monterey        | 12      | 4    |
+| macOS Ventura         | 13      | 4    |
+| macOS Sonoma          | 14      | 4    |
 
 ### Required external commands
 
@@ -214,6 +255,7 @@ The table below lists all possible exit status and corresponding messages:
 | 224    | Failed to convert disk image into bootable install media.                             |
 | 223    | Failed to create ISO image.                                                           |
 | 222    | \[FILE\] contains a broken createinstallmedia command.                                |
+| 221    | Couldn't get installer application minimum macOS version.                             |
 
 ## License
 

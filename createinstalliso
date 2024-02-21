@@ -57,6 +57,9 @@ declare -r -a const_supported_macos_version_strings_regex=(
     '^10\.14(\.[[:digit:]+])?$'           # macOS Mojave          10.14
     '^10\.15(\.[[:digit:]+])?$'           # macOS Catalina        10.15
     '^11\.[[:digit:]]+(\.[[:digit:]+])?$' # macOS Big Sur         11
+    '^12\.[[:digit:]]+(\.[[:digit:]+])?$' # macOS Monterey        12
+    '^13\.[[:digit:]]+(\.[[:digit:]+])?$' # macOS Ventura         13
+    '^14\.[[:digit:]]+(\.[[:digit:]+])?$' # macOS Sonoma          14
 )
 
 # This script has been tested with the following installer applications.
@@ -71,6 +74,9 @@ declare -r -a const_supported_installer_application_display_names=(
     "Install macOS Mojave"       # 10.14
     "Install macOS Catalina"     # 10.15
     "Install macOS Big Sur"      # 11
+    "Install macOS Monterey"     # 12
+    "Install macOS Ventura"      # 13
+    "Install macOS Sonoma"       # 14
 )
 
 # List of all known macOS version names and their corresponding version
@@ -94,6 +100,9 @@ declare -r -a const_known_macos_names_and_version_strings_regex=(
     '^10\.14.*$ # macOS Mojave'          # 10.14
     '^10\.15.*$ # macOS Catalina'        # 10.15
     '^11\..*$   # macOS Big Sur'         # 11
+    '^12\..*$   # macOS Monterey'        # 12
+    '^13\..*$   # macOS Ventura'         # 13
+    '^14\..*$   # macOS Sonoma'          # 14
 )
 
 # Make sure that macOS Big Sur reports 11 as the macOS version instead
@@ -314,31 +323,18 @@ main() {
     # ------------------------------------------------------------------
 
     local installer_minimum_macos_version_string
-    local -i installer_minimum_macos_version_for_compare
+    local -i minimum_macos_version_for_compare
 
     if ! is_supported_installer_application_display_name "${installer_application_display_name}"; then
         print_warning "${installer_application_display_name} has not been tested with this tool."
     fi
 
-    # An installer application type '3' requires OS X Mountain Lion 10.8
-    # or higher to run 'createinstallmedia'.
-    if [[ "${installer_application_type}" == 3 ]]; then
-        installer_minimum_macos_version_string="10.8"
-    fi
+    installer_minimum_macos_version_string="$(get_minimum_macos_version_string "${installer_application_path}" "${installer_application_display_name}")" || exit_with_status 221 "Couldn't get installer application minimum macOS version."
+    minimum_macos_version_for_compare="$(create_macos_version_for_compare "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
 
-    # An installer application type '4' requires OS X Mavericks 10.9
-    # or higher to run 'createinstallmedia'.
-    if [[ "${installer_application_type}" == 4 ]]; then
-        installer_minimum_macos_version_string="10.9"
-    fi
-
-    if [[ ("${installer_application_type}" == 3) || ("${installer_application_type}" == 4) ]]; then
-        installer_minimum_macos_version_for_compare="$(create_macos_version_for_compare "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
-
-        if (( installer_minimum_macos_version_for_compare > macos_version_for_compare )); then
-            macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
-            exit_with_status 238 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
-        fi
+    if (( minimum_macos_version_for_compare > macos_version_for_compare )); then
+        macos_name_and_version="$(create_macos_name_and_version "${installer_minimum_macos_version_string}")" || exit_with_status 247 "Invalid macOS version."
+        exit_with_status 238 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
     fi
 
     # ------------------------------------------------------------------
@@ -417,6 +413,9 @@ main() {
 
         # Installer application type '4' for:
         # - macOS Big Sur 11
+        # - macOS Monterey 12
+        # - macOS Ventura 13
+        # - macOS Sonoma 14
         4 )
             (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
             (( required_in_global_tmp_directory = required_in_global_tmp_directory + 800000000 ))
@@ -514,8 +513,14 @@ main() {
         # - macOS High Sierra 10.13
         # - macOS Mojave 10.14
         # - macOS Catalina 10.15
+        #
+        # or
+        #
         # Installer application type '4' for:
         # - macOS Big Sur 11
+        # - macOS Monterey 12
+        # - macOS Ventura 13
+        # - macOS Sonoma 14
         3 | 4 )
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
@@ -1360,6 +1365,9 @@ is_valid_installer_application_path() {
     local installer_application_identifier
     local valid_installer_application_identifier_regex='^com\.apple\.InstallAssistant\.[a-zA-Z0-9.-]+$'
 
+    local installer_application_minimum_system_version
+    local valid_installer_application_minimum_system_version='^[[:digit:]]+\.[[:digit:]]+\.?[[:digit:]]*$'
+
     local system_image_url
 
     is_not_empty "${installer_application_path}" || return 1
@@ -1370,6 +1378,18 @@ is_valid_installer_application_path() {
     # compatibility of the script.
     installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || return 1
     is_not_empty "${installer_application_display_name}" || return 1
+
+    # This file is required because it contains the value for
+    # 'LSMinimumSystemVersion', which is the minimum system version
+    # required for the installer application. This version is used in
+    # case the installer application is not explicitly listed in the
+    # function 'get_minimum_macos_version_string'.
+    if is_file "${installer_application_path}/Contents/Info.plist"; then
+        installer_application_minimum_system_version="$(get_installer_application_minimum_system_version "${installer_application_path}")" || return 1
+        [[ "${installer_application_minimum_system_version}" =~ ${valid_installer_application_minimum_system_version} ]] || return 1
+    else
+        return 1
+    fi
 
     installer_application_type="$(get_installer_application_type "${installer_application_path}")" || return 1
 
@@ -1456,6 +1476,9 @@ is_valid_installer_application_path() {
 
         # Installer application type '4' for:
         # - macOS Big Sur 11
+        # - macOS Monterey 12
+        # - macOS Ventura 13
+        # - macOS Sonoma 14
         4 )
             # Apple's command 'createinstallmedia' is required because
             # it will be used to create the installer disk image.
@@ -1558,6 +1581,9 @@ get_installer_application_display_name() {
 ##               - macOS Catalina 10.15
 ##             * Installer application type '4' for:
 ##               - macOS Big Sur 11
+##               - macOS Monterey 12
+##               - macOS Ventura 13
+##               - macOS Sonoma 14
 ##
 ## @param      $1    The path to an installer application.
 ##
@@ -1594,6 +1620,70 @@ get_installer_application_type()
 }
 
 ##
+## @brief      Gets the minimum macOS version required to create an ISO
+##             image from the installer application.
+##
+## @param      $1    The path to an installer application.
+## @param      $2    The installer application display name.
+##
+## @return     The minimum macOS version string.
+##
+get_minimum_macos_version_string() {
+    local -r installer_application_path="$1"
+    local -r installer_application_display_name="$2"
+    local minimum_macos_version_string
+
+    case "${installer_application_display_name}" in
+
+        # Installer application for:
+        # - Mac OS X Lion 10.7
+        # - OS X Mountain Lion 10.8
+        # - OS X Mavericks 10.9
+        # - OS X Yosemite 10.10
+        # - OS X El Capitan 10.11
+        "Install Mac OS X Lion" | "Install OS X Mountain Lion" | "Install OS X Mavericks" | "Install OS X Yosemite" | "Install OS X El Capitan" )
+            minimum_macos_version_string="10.6"
+            ;;
+
+        # Installer application for:
+        # - macOS Sierra 10.12
+        # - macOS High Sierra 10.13
+        # - macOS Mojave 10.14
+        # - macOS Catalina 10.15
+        "Install macOS Sierra" | "Install macOS High Sierra" | "Install macOS Mojave" | "Install macOS Catalina" )
+            minimum_macos_version_string="10.8"
+            ;;
+
+        # Installer application for:
+        # - macOS Big Sur 11
+        # - macOS Monterey 12
+        "Install macOS Big Sur" | "Install macOS Monterey" )
+            minimum_macos_version_string="10.9"
+            ;;
+
+        # Installer application for:
+        # - macOS Ventura 13
+        "Install macOS Ventura" )
+            minimum_macos_version_string="10.11"
+            ;;
+
+        # Installer application for:
+        # - macOS Sonoma 14
+        "Install macOS Sonoma" )
+            minimum_macos_version_string="10.13"
+            ;;
+
+        # Unknown installer application
+        * )
+            minimum_macos_version_string="$(get_installer_application_minimum_system_version "${installer_application_path}")" || return 1
+            ;;
+
+    esac
+
+    echo "${minimum_macos_version_string}"
+}
+
+##
 ## @brief      Gets the total non empty bytes of a disk image.
 ##
 ## @param      $1    The disk image.
@@ -1613,6 +1703,22 @@ get_disk_image_total_non_empty_bytes() {
     hdiutil imageinfo "${disk_image}" -plist >"${plist_file}" 2>/dev/null || return 1
 
     get_plist_value ":Size Information:Total Non-Empty Bytes" "${plist_file}"
+}
+
+##
+## @brief      Gets the 'minimum system version' of an installer
+##             application.
+##
+## @param      $1    The path to an installer application.
+##
+## @return     The installer application 'minimum system version'.
+##
+get_installer_application_minimum_system_version() {
+    local -r installer_application_path="$1"
+
+    is_not_empty "${installer_application_path}" || return 1
+
+    get_plist_value ":LSMinimumSystemVersion" "${installer_application_path}/Contents/Info.plist"
 }
 
 ##
