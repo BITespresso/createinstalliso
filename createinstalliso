@@ -1988,7 +1988,7 @@ parse_create_install_media() {
 script_createinstallmedia_canceled_by_sigint() {
     local -r -i exit_status="$1"
 
-    [[ "${exit_status}" == 2 ]]
+    [[ "${exit_status}" -eq 2 ]]
 }
 
 ##
@@ -2005,7 +2005,7 @@ script_createinstallmedia_canceled_by_sigint() {
 script_createinstallmedia_canceled_by_sigquit() {
     local -r -i exit_status="$1"
 
-    [[ "${exit_status}" == 3 ]]
+    [[ "${exit_status}" -eq 3 ]]
 }
 
 ##
@@ -2202,7 +2202,7 @@ script_hdiutil_makehybrid_canceled_by_sigint() {
 script_hdiutil_makehybrid_canceled_by_sigquit() {
     local -r -i exit_status="$1"
 
-    [[ "${exit_status}" == 3 ]]
+    [[ "${exit_status}" -eq 3 ]]
 }
 
 ##
