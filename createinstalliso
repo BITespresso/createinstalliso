@@ -83,26 +83,26 @@ declare -r -a const_supported_installer_application_display_names=(
 # string regex. The regex expression and the macOS version name must
 # be separated by the '#' character.
 declare -r -a const_known_macos_names_and_version_strings_regex=(
-    '^10\.0.*$  # Mac OS X Cheetah'      # 10.0
-    '^10\.1.*$  # Mac OS X Puma'         # 10.1
-    '^10\.2.*$  # Mac OS X Jaguar'       # 10.2
-    '^10\.3.*$  # Mac OS X Panther'      # 10.3
-    '^10\.4.*$  # Mac OS X Tiger'        # 10.4
-    '^10\.5.*$  # Mac OS X Leopard'      # 10.5
-    '^10\.6.*$  # Mac OS X Snow Leopard' # 10.6
-    '^10\.7.*$  # Mac OS X Lion'         # 10.7
-    '^10\.8.*$  # OS X Mountain Lion'    # 10.8
-    '^10\.9.*$  # OS X Mavericks'        # 10.9
-    '^10\.10.*$ # OS X Yosemite'         # 10.10
-    '^10\.11.*$ # OS X El Capitan'       # 10.11
-    '^10\.12.*$ # macOS Sierra'          # 10.12
-    '^10\.13.*$ # macOS High Sierra'     # 10.13
-    '^10\.14.*$ # macOS Mojave'          # 10.14
-    '^10\.15.*$ # macOS Catalina'        # 10.15
-    '^11\..*$   # macOS Big Sur'         # 11
-    '^12\..*$   # macOS Monterey'        # 12
-    '^13\..*$   # macOS Ventura'         # 13
-    '^14\..*$   # macOS Sonoma'          # 14
+    '^10\.0(\.[[:digit:]+])?$            # Mac OS X Cheetah'      # 10.0
+    '^10\.1(\.[[:digit:]+])?$            # Mac OS X Puma'         # 10.1
+    '^10\.2(\.[[:digit:]+])?$            # Mac OS X Jaguar'       # 10.2
+    '^10\.3(\.[[:digit:]+])?$            # Mac OS X Panther'      # 10.3
+    '^10\.4(\.[[:digit:]+])?$            # Mac OS X Tiger'        # 10.4
+    '^10\.5(\.[[:digit:]+])?$            # Mac OS X Leopard'      # 10.5
+    '^10\.6(\.[[:digit:]+])?$            # Mac OS X Snow Leopard' # 10.6
+    '^10\.7(\.[[:digit:]+])?$            # Mac OS X Lion'         # 10.7
+    '^10\.8(\.[[:digit:]+])?$            # OS X Mountain Lion'    # 10.8
+    '^10\.9(\.[[:digit:]+])?$            # OS X Mavericks'        # 10.9
+    '^10\.10(\.[[:digit:]+])?$           # OS X Yosemite'         # 10.10
+    '^10\.11(\.[[:digit:]+])?$           # OS X El Capitan'       # 10.11
+    '^10\.12(\.[[:digit:]+])?$           # macOS Sierra'          # 10.12
+    '^10\.13(\.[[:digit:]+])?$           # macOS High Sierra'     # 10.13
+    '^10\.14(\.[[:digit:]+])?$           # macOS Mojave'          # 10.14
+    '^10\.15(\.[[:digit:]+])?$           # macOS Catalina'        # 10.15
+    '^11\.[[:digit:]]+(\.[[:digit:]+])?$ # macOS Big Sur'         # 11
+    '^12\.[[:digit:]]+(\.[[:digit:]+])?$ # macOS Monterey'        # 12
+    '^13\.[[:digit:]]+(\.[[:digit:]+])?$ # macOS Ventura'         # 13
+    '^14\.[[:digit:]]+(\.[[:digit:]+])?$ # macOS Sonoma'          # 14
 )
 
 # Make sure that macOS Big Sur reports 11 as the macOS version instead
