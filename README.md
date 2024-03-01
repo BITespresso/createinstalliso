@@ -203,7 +203,7 @@ The known installer application types are:
 
 ### Required external commands
 
-**createinstalliso** uses a number of external commands, which must be available on your system: `awk`, `bless`, `cp`, `df`, `du`, `hdiutil`, `mktemp`, `ps`, `pwd`, `rm`, `script`, `seq`, `stat`, `sw_vers`, `tput`, `uname` and `/usr/libexec/PlistBuddy`.
+**createinstalliso** uses a number of external commands, which must be available on your system: `awk`, `bless`, `cp`, `cut`, `df`, `du`, `hdiutil`, `mktemp`, `ps`, `pwd`, `rm`, `script`, `seq`, `stat`, `sw_vers`, `tput`, `uname` and `/usr/libexec/PlistBuddy`.
 
 Unless you have deliberately modified your system, all of the above commands are available on the macOS versions listed in the section "[Compatibility](#user-content-compatibility)".
 

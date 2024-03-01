@@ -30,10 +30,12 @@ declare -r const_script_name="createinstalliso"
 declare -r const_minimum_required_macos_version_string="10.6"
 declare -r -i const_root_uid=0
 
-# This script requires /usr/libexec/PlistBuddy to read values from
+# List of unsupported macOS versions.
+#
+# NOTE: This script requires /usr/libexec/PlistBuddy to read values from
 # property list files. PlistBuddy is available on Mac OS X 10.5 Leopard
-# or later. However on Mac OS X 10.5 Leopard PlistBuddy does not handle
-# large integer values correctly. Therefore, this script requires
+# or later. However, on Mac OS X 10.5 Leopard, PlistBuddy does not
+# handle large integer values correctly. Therefore, this script requires
 # Mac OS X 10.6 Snow Leopard or later.
 declare -r -a const_unsupported_macos_version_strings_regex=(
     '^10\.0(\.[[:digit:]+])?$'            # Mac OS X Cheetah      10.0
@@ -44,7 +46,7 @@ declare -r -a const_unsupported_macos_version_strings_regex=(
     '^10\.5(\.[[:digit:]+])?$'            # Mac OS X Leopard      10.5
 )
 
-# This script has been tested on the following macOS versions.
+# List of all supported macOS versions.
 declare -r -a const_supported_macos_version_strings_regex=(
     '^10\.6(\.[[:digit:]+])?$'            # Mac OS X Snow Leopard 10.6
     '^10\.7(\.[[:digit:]+])?$'            # Mac OS X Lion         10.7
@@ -62,21 +64,26 @@ declare -r -a const_supported_macos_version_strings_regex=(
     '^14\.[[:digit:]]+(\.[[:digit:]+])?$' # macOS Sonoma          14
 )
 
-# This script has been tested with the following installer applications.
-declare -r -a const_supported_installer_application_display_names=(
-    "Install Mac OS X Lion"      # 10.7
-    "Install OS X Mountain Lion" # 10.8
-    "Install OS X Mavericks"     # 10.9
-    "Install OS X Yosemite"      # 10.10
-    "Install OS X El Capitan"    # 10.11
-    "Install macOS Sierra"       # 10.12
-    "Install macOS High Sierra"  # 10.13
-    "Install macOS Mojave"       # 10.14
-    "Install macOS Catalina"     # 10.15
-    "Install macOS Big Sur"      # 11
-    "Install macOS Monterey"     # 12
-    "Install macOS Ventura"      # 13
-    "Install macOS Sonoma"       # 14
+# List of all supported installer applications and their disk space
+# offset requirements for the installer application types '3' and '4'
+# (see 'get_offset_for_global_tmp_directory' and
+# 'get_offset_for_iso_directory_path'). The disk space offset
+# requirements must each be separated by the '#' character each. The
+# disk space offset requirements are specified in millions of bytes.
+declare -r -a const_supported_installer_application_display_names_and_offsets=(
+    'Install Mac OS X Lion      #      #     ' # 10.7
+    'Install OS X Mountain Lion #      #     ' # 10.8
+    'Install OS X Mavericks     #      #     ' # 10.9
+    'Install OS X Yosemite      #      #     ' # 10.10
+    'Install OS X El Capitan    #      #     ' # 10.11
+    'Install macOS Sierra       #  100 #  100' # 10.12
+    'Install macOS High Sierra  #  100 #  100' # 10.13
+    'Install macOS Mojave       #  100 #  100' # 10.14
+    'Install macOS Catalina     #  100 #  100' # 10.15
+    'Install macOS Big Sur      #  800 #  800' # 11
+    'Install macOS Monterey     # 1900 # 1300' # 12
+    'Install macOS Ventura      # 1450 # 1300' # 13
+    'Install macOS Sonoma       # 2100 # 1350' # 14
 )
 
 # List of all known macOS version names and their corresponding version
@@ -370,6 +377,8 @@ main() {
     local -i available_in_iso_directory_path
     local -i required_in_global_tmp_directory
     local -i required_in_iso_directory_path
+    local -i offset_for_global_tmp_directory
+    local -i offset_for_iso_directory_path
     local -i missing_in_global_tmp_directory
     local -i missing_in_iso_directory_path
 
@@ -404,23 +413,24 @@ main() {
         # - macOS High Sierra 10.13
         # - macOS Mojave 10.14
         # - macOS Catalina 10.15
-        3 )
-            (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
-            (( required_in_global_tmp_directory = required_in_global_tmp_directory + 100000000 ))
-
-            (( required_in_iso_directory_path = required_in_global_tmp_directory ))
-            ;;
-
+        #
+        # or
+        #
         # Installer application type '4' for:
         # - macOS Big Sur 11
         # - macOS Monterey 12
         # - macOS Ventura 13
         # - macOS Sonoma 14
-        4 )
+        3 | 4 )
             (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
-            (( required_in_global_tmp_directory = required_in_global_tmp_directory + 800000000 ))
+            offset_for_global_tmp_directory="$(get_offset_for_global_tmp_directory "${installer_application_display_name}")" || offset_for_global_tmp_directory=0
+            (( offset_for_global_tmp_directory = offset_for_global_tmp_directory * 1000000 ))
+            (( required_in_global_tmp_directory = required_in_global_tmp_directory + offset_for_global_tmp_directory ))
 
-            (( required_in_iso_directory_path = required_in_global_tmp_directory ))
+            (( required_in_iso_directory_path = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            offset_for_iso_directory_path="$(get_offset_for_iso_directory_path "${installer_application_display_name}")" || offset_for_iso_directory_path=0
+            (( offset_for_iso_directory_path = offset_for_iso_directory_path * 1000000 ))
+            (( required_in_iso_directory_path = required_in_iso_directory_path + offset_for_iso_directory_path ))
             ;;
 
     esac
@@ -753,30 +763,6 @@ is_not_empty() {
 }
 
 ##
-## @brief      Determines whether an item is contained in an array. The
-##             array is passed to the function by reference via its
-##             name.
-##
-## @param      $1       An item.
-## @param      $2       The name of the array as string.
-##
-## @retval     `true`   The item is contained in the array.
-## @retval     `false`  Otherwise.
-##
-is_array_item() {
-    local -r item="$1"
-    local -r array_name="$2[@]"
-    local current_item
-
-    for current_item in "${!array_name}"; do
-        if [[ "${item}" == "${current_item}" ]]; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-##
 ## @brief      Determines whether an item matches a regex expression in
 ##             an array. The array is passed to the function by
 ##             reference via its name.
@@ -827,6 +813,51 @@ get_absolute_logical_path() {
     fi
 
     return 0
+}
+
+##
+## @brief      Gets the item in a string array starting with the
+##             specified string. The array is passed to the function by
+##             reference via its name.
+##
+## @param      $1    The string.
+## @param      $2    The name of the array as string.
+##
+## @return     The item starting with the string.
+##
+get_item_starting_with_string() {
+    local -r string="$1"
+    local -r array_name="$2[@]"
+    local current_item
+
+    for current_item in "${!array_name}"; do
+        if [[ "${current_item}" == "${string}"* ]]; then
+            echo "${current_item}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+##
+## @brief      Gets the content of the field specified by the field
+##             number from a string containing fields delimited by the
+##             '#' character. The content of the field is trimmed to
+##             remove leading and trailing whitespace.
+##
+## @param      $1    The string.
+## @param      $2    The field number starting from number 1.
+##
+## @return     The trimmed field content.
+##
+get_trimmed_field_content() {
+    local -r string="$1"
+    local -r -i field_number="$2"
+    local field
+
+    field="$(cut -d# -f"${field_number}" <<<"${string}")" || return 1
+
+    trim "${field}"
 }
 
 ##
@@ -1100,13 +1131,18 @@ print_error_usage() {
 ##             output to the user (e.g. 'Install macOS Sierra.app').
 ##
 create_example_installer_application_name() {
-    local -r -i number_of_elements="${#const_supported_installer_application_display_names[@]}"
-    local example_installer_application_name="${const_supported_installer_application_display_names[${number_of_elements}-1]}.app"
+    local -r -i number_of_elements="${#const_supported_installer_application_display_names_and_offsets[@]}"
+    local item="${const_supported_installer_application_display_names_and_offsets[${number_of_elements}-1]}"
+    local example_installer_application_name="$(get_trimmed_field_content "${item}" 1).app"
     local -i i
+    local installer_application_name
 
     for (( i = number_of_elements - 1; i >= 0; i-- )); do
-        if is_valid_installer_application_path "/Applications/${const_supported_installer_application_display_names[${i}]}.app"; then
-            example_installer_application_name="${const_supported_installer_application_display_names[${i}]}.app"
+        item="${const_supported_installer_application_display_names_and_offsets[${i}]}"
+        installer_application_name="$(get_trimmed_field_content "${item}" 1).app"
+
+        if is_valid_installer_application_path "/Applications/${installer_application_name}"; then
+            example_installer_application_name="${installer_application_name}"
             break
         fi
     done
@@ -1539,7 +1575,7 @@ is_invalid_macos_sierra_installer_application() {
 is_supported_installer_application_display_name() {
     local -r installer_application_display_name="$1"
 
-    is_array_item "${installer_application_display_name}" "const_supported_installer_application_display_names"
+    get_item_starting_with_string "${installer_application_display_name}" "const_supported_installer_application_display_names_and_offsets" >/dev/null
 }
 
 ##
@@ -1703,6 +1739,38 @@ get_disk_image_total_non_empty_bytes() {
     hdiutil imageinfo "${disk_image}" -plist >"${plist_file}" 2>/dev/null || return 1
 
     get_plist_value ":Size Information:Total Non-Empty Bytes" "${plist_file}"
+}
+
+##
+## @brief      Gets the offset for the required disk space on the volume
+##             where the global temporary directory is located.
+##
+## @param      $1    The installer application display name.
+##
+## @return     The offset in bytes.
+##
+get_offset_for_global_tmp_directory() {
+    local -r installer_application_display_name="$1"
+    local item
+
+    item="$(get_item_starting_with_string "${installer_application_display_name}" "const_supported_installer_application_display_names_and_offsets")" || return 1
+    get_trimmed_field_content "${item}" 2
+}
+
+##
+## @brief      Gets the offset for the required disk space on the volume
+##             where the ISO image file will be created.
+##
+## @param      $1    The installer application display name.
+##
+## @return     The offset in bytes.
+##
+get_offset_for_iso_directory_path() {
+    local -r installer_application_display_name="$1"
+    local item
+
+    item="$(get_item_starting_with_string "${installer_application_display_name}" "const_supported_installer_application_display_names_and_offsets")" || return 1
+    get_trimmed_field_content "${item}" 3
 }
 
 ##
