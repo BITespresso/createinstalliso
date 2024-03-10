@@ -503,7 +503,7 @@ main() {
 
             echo "Making disk image bootable..."
             core_services_directory="${global_install_disk_mountpoint}/System/Library/CoreServices"
-            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --openfolder "${global_install_disk_mountpoint}" --label "${installer_application_display_name}" >/dev/null || exit_with_status 229 "The bless of the installer disk image failed."
+            bless --folder "${core_services_directory}" --file "${core_services_directory}/boot.efi" --label "${installer_application_display_name}" >/dev/null || exit_with_status 229 "The bless of the installer disk image failed."
 
             echo "Copying installer image..."
             cp -P -p "${base_system_image}" "${global_install_disk_mountpoint}/" >/dev/null || exit_with_status 228 "Failed to copy BaseSystem.dmg."
