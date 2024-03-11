@@ -482,9 +482,8 @@ main() {
         # - OS X El Capitan 10.11
         2 )
             install_esd_image="${installer_application_path}/Contents/SharedSupport/InstallESD.dmg"
-            install_esd_shadow="${global_tmp_directory}/InstallESD.shadow"
             global_install_esd_mountpoint="${global_tmp_directory}/InstallESD"
-            hdiutil attach "${install_esd_image}" -shadow "${install_esd_shadow}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 236 "Mount of outer dmg failed."
+            hdiutil attach "${install_esd_image}" -readonly -mountpoint "${global_install_esd_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 236 "Mount of outer dmg failed."
 
             base_system_image="${global_install_esd_mountpoint}/BaseSystem.dmg"
             is_file "${base_system_image}" || exit_with_status 235 "BaseSystem missing from the outer dmg, damaged installer image?"
