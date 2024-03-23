@@ -1961,13 +1961,13 @@ parse_create_install_media() {
         'Done.'
         'Install media now available at '
     )
-    local -r trigger_text="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_array[@]}")"
+    local -r trigger_text="$(printf "${separator}"; printf "%s${separator}" "${trigger_text_array[@]}")"
     local -r -a trigger_line_mute_array=(
         'Copy complete.'
         'Done.'
         'Install media now available at '
     )
-    local -r trigger_line_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
+    local -r trigger_line_mute="$(printf "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
     local -r trigger_newline_mute_array=(
         '100%...'
         ' 100%'
@@ -1977,12 +1977,12 @@ parse_create_install_media() {
         'Copying installer files to disk...'
         'Copying to disk: 0%...'
     )
-    local -r trigger_copying_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_copying_line_array[@]}")"
-    local -r trigger_newline_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_newline_mute_array[@]}")"
+    local -r trigger_copying_line="$(printf "${separator}"; printf "%s${separator}" "${trigger_copying_line_array[@]}")"
+    local -r trigger_newline_mute="$(printf "${separator}"; printf "%s${separator}" "${trigger_newline_mute_array[@]}")"
     local -r trigger_making_line_array=(
         'Making disk bootable...'
     )
-    local -r trigger_making_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_making_line_array[@]}")"
+    local -r trigger_making_line="$(printf "${separator}"; printf "%s${separator}" "${trigger_making_line_array[@]}")"
     local is_line_mute="false"
     local is_newline_mute="false"
 
@@ -2125,20 +2125,20 @@ parse_create_iso_image() {
         'hdiutil: '
         'canceling...'
     )
-    local -r trigger_text="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_text_array[@]}")"
+    local -r trigger_text="$(printf "${separator}"; printf "%s${separator}" "${trigger_text_array[@]}")"
     local -r -a trigger_line_mute_array=(
         'Creating hybrid image...'
         'hdiutil: '
     )
-    local -r trigger_line_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
+    local -r trigger_line_mute="$(printf "${separator}"; printf "%s${separator}" "${trigger_line_mute_array[@]}")"
     local -r -a trigger_progress_line_array=(
         'Creating hybrid image...'
     )
-    local -r trigger_progress_line="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_progress_line_array[@]}")"
+    local -r trigger_progress_line="$(printf "${separator}"; printf "%s${separator}" "${trigger_progress_line_array[@]}")"
     local -r -a trigger_mute_array=(
         'canceling...'
     )
-    local -r trigger_mute="$(printf "%s" "${separator}"; printf "%s${separator}" "${trigger_mute_array[@]}")"
+    local -r trigger_mute="$(printf "${separator}"; printf "%s${separator}" "${trigger_mute_array[@]}")"
     local is_line_mute="false"
     local is_mute="false"
     local is_progress_line="false"
