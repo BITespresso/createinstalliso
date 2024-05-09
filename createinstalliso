@@ -347,7 +347,7 @@ main() {
     local type_of_existing_destination
 
     if [[ "${installer_application_display_name}" == "Install macOS Sierra" ]] && is_defective_macos_sierra_installer_application "${option_applicationpath}"; then
-        if [[ ! "${option_nointeraction}" == "true" ]]; then
+        if [[ "${option_nointeraction}" != "true" ]]; then
             echo "${installer_application_path} is a defective macOS Sierra installer application."
             echo "To continue we need to temporarily patch the file ${installer_application_path}/Contents/Info.plist."
 
@@ -367,7 +367,7 @@ main() {
             type_of_existing_destination="directory"
         fi
 
-        if [[ ! "${option_nointeraction}" == "true" ]]; then
+        if [[ "${option_nointeraction}" != "true" ]]; then
             echo "Ready to start."
             echo "To continue we need to delete the ${type_of_existing_destination} ${iso_destination_image}."
 
