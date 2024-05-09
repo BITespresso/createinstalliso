@@ -13,7 +13,7 @@ Creates a bootable ISO image from a macOS installer application. This image can 
     2. [Example for the macOS Catalina installer](#user-content-example-for-the-macos-catalina-installer)
 6. [Troubleshooting](#user-content-troubleshooting)
     1. [Alert during macOS installation from ISO image](#user-content-alert-during-macos-installation-from-iso-image)
-    2. [Error message: ... contains a broken createinstallmedia command.](#user-content-error-message--contains-a-broken-createinstallmedia-command)
+    2. [Install macOS Sierra (Version 12.6.06)](#user-content-install-macos-sierra--version-12-6-06-)
 7. [References](#user-content-references)
     1. [Installer application types](#user-content-installer-application-types)
     2. [Required external commands](#user-content-required-external-commands)
@@ -149,9 +149,11 @@ The command **createinstalliso** requires the following two command line argumen
 * `--isodirectory` (or `-i`) must be followed by a path to a directory where the installer ISO image file will be created.
 * `--applicationpath` (or `-a`) must be followed by a path to a copy of the OS installer application to create the bootable ISO image from.
 
-The name of the ISO image to be created is made up of the name of the installer and has the extension `iso` (e.g. `Install macOS Catalina.iso`). If such a file already exists in the specified destination directory, you will be prompted for confirmation before this file is overwritten. If you do not care about overwriting an existing file and do not want to be prompted, you can add the command line option:
+The name of the ISO image to be created is made up of the name of the installer and has the extension `iso` (e.g. `Install macOS Catalina.iso`). If such a file already exists in the specified destination directory, you will be prompted for confirmation before this file is overwritten. If you do not care about overwriting an existing file and do not want to be prompted, you can add the command line option `--nointeraction`.
 
-* `--nointeraction` (or `-n`) which causes an existing ISO image file to **always** be overwritten.
+If you want to suppress user interactions when running the command and always allow the required actions, you can add the option:
+
+* `--nointeraction` (or `-n`) which causes an existing ISO image file to be overwritten and/or patch a defective macOS Sierra installer application without prompting for confirmation.
 
 ### Example for the macOS Catalina installer
 
@@ -184,13 +186,11 @@ To manually set the system date to a value in the past, perform the following st
 * Type `date 100800002019` into Terminal, then press Return. This sets the system date to October 8, 2019, 0:00 am.
 * Quit Terminal and resume the macOS installation.
 
-### Error message: ... contains a broken createinstallmedia command.
+### Install macOS Sierra (Version 12.6.06)
 
-If **createinstalliso** terminates with the error message `... contains a broken 'createinstallmedia' command.` you are using the *new* **macOS Sierra** installer.
+When Apple released this particular macOS Sierra installer application, a bug was introduced that causes the included `createinstallmedia` command to fail with an error message about an invalid mount point. Thanks to [Eric Knibbe](https://github.com/EricFromCanada) this bug can easily be fixed by changing the value for `CFBundleShortVersionString` from `12.6.06` to `12.6.03` in the file `Info.plist` (see: [#4](https://github.com/BITespresso/createinstalliso/issues/4)).
 
-While this *new* installer solves the problem with an expired certificate, it unfortunately introduced a bug that makes the included `createinstallmedia` command unusable because it **always** complains about the mount point. Since `createinstallmedia` is used internally by **createinstalliso**, it is *not* possible to use this *new* version of the macOS Sierra installer.
-
-Therefore, the only solution is to obtain an *old* macOS Sierra installer and follow the procedure described in the section "[Alert during macOS installation from ISO image](#user-content-alert-during-macos-installation-from-iso-image)".
+If **createinstalliso** detects this defective version of the macOS Sierra installer application, it will offer you to temporarily patch the `Info.plist` file by applying the above change. The original `Info.plist` will be automatically restored when **createinstalliso** terminates. This requires, of course, that the installer is on a writable medium.
 
 ## References
 
@@ -269,8 +269,9 @@ The table below lists all possible exit status and corresponding messages:
 | 225    | Failed to create disk image.                                                          |
 | 224    | Failed to convert disk image into bootable install media.                             |
 | 223    | Failed to create ISO image.                                                           |
-| 222    | \[FILE\] contains a broken createinstallmedia command.                                |
+| 222    | \[NOT USED SINCE 1.1\]                                                                |
 | 221    | Couldn't get installer application minimum macOS version.                             |
+| 220    | Failed to patch the file \[FILE\], is write-protected?                                |
 
 ## License
 

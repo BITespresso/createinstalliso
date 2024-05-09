@@ -29,6 +29,9 @@ fi
 declare -r const_script_name="createinstalliso"
 declare -r const_minimum_required_macos_version_string="10.6"
 declare -r -i const_root_uid=0
+declare -r const_defective_macos_sierra_installer_application_short_version_string="12.6.06"
+declare -r const_patched_macos_sierra_installer_application_short_version_string="12.6.03"
+declare -r const_macos_sierra_installer_application_info_plist_directory="Install macOS Sierra.app/Contents"
 
 # List of unsupported macOS versions.
 #
@@ -117,6 +120,7 @@ declare -r -a const_known_macos_names_and_version_strings_regex=(
 unset SYSTEM_VERSION_COMPAT
 
 unset global_tmp_directory
+unset global_patched_macos_sierra_installer_application_path
 unset global_install_esd_mountpoint
 unset global_install_disk_mountpoint
 unset global_install_disk_device_node
@@ -318,14 +322,6 @@ main() {
     random_string="${global_tmp_directory##*.}"
 
     # ------------------------------------------------------------------
-    # Check for invalid macOS Sierra installer application
-    # ------------------------------------------------------------------
-
-    if [[ "${installer_application_display_name}" == "Install macOS Sierra" ]] && is_invalid_macos_sierra_installer_application "${option_applicationpath}"; then
-        exit_with_status 222 "${option_applicationpath} contains a broken 'createinstallmedia' command."
-    fi
-
-    # ------------------------------------------------------------------
     # Check installer application requirements
     # ------------------------------------------------------------------
 
@@ -350,6 +346,20 @@ main() {
 
     local type_of_existing_destination
 
+    if [[ "${installer_application_display_name}" == "Install macOS Sierra" ]] && is_defective_macos_sierra_installer_application "${option_applicationpath}"; then
+        if [[ ! "${option_nointeraction}" == "true" ]]; then
+            echo "${installer_application_path} is a defective macOS Sierra installer application."
+            echo "To continue we need to temporarily patch the file ${installer_application_path}/Contents/Info.plist."
+
+            if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
+                echo "Operation canceled."
+                exit_with_status 0
+            fi
+        fi
+
+        patch_info_plist_in_macos_sierra_installer_application "${installer_application_path}" || exit_with_status 220 "Failed to patch the file ${installer_application_path}/Contents/Info.plist, is write-protected?"
+    fi
+
     if is_existing "${iso_destination_image}"; then
         if is_file "${iso_destination_image}"; then
             type_of_existing_destination="file"
@@ -360,6 +370,7 @@ main() {
         if [[ ! "${option_nointeraction}" == "true" ]]; then
             echo "Ready to start."
             echo "To continue we need to delete the ${type_of_existing_destination} ${iso_destination_image}."
+
             if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
                 echo "Operation canceled."
                 exit_with_status 0
@@ -748,6 +759,21 @@ is_directory() {
 }
 
 ##
+## @brief      Determines whether the specified file exists and the user
+##             has write access.
+##
+## @param      $1       The file to be checked.
+##
+## @retval     `true`   The file exists and the user has write access.
+## @retval     `false`  Otherwise.
+##
+is_writable() {
+    local -r file_or_directory="$1"
+
+    [[ -f "${file_or_directory}" ]]
+}
+
+##
 ## @brief      Determines whether the specified string is not empty.
 ##
 ## @param      $1       The string to be checked.
@@ -899,6 +925,25 @@ get_plist_value() {
 }
 
 ##
+## @brief      Sets the value of an entry in a property list file.
+##
+## @param      $1    A property list entry name.
+## @param      $2    The new value for the specified property list entry.
+## @param      $3    A property list file.
+##
+set_plist_value() {
+    local -r entry="$1"
+    local -r value="$2"
+    local -r plist_file="$3"
+
+    is_not_empty "${entry}" || return 1
+    is_not_empty "${value}" || return 1
+    is_not_empty "${plist_file}" || return 1
+
+    execute_plist_buddy_command "Set '${entry}' '${value}'" "${plist_file}" >/dev/null
+}
+
+##
 ## @brief      Executes a PlistBuddy command on a property list file.
 ##
 ## @param      $1    The command to be executed by PlistBuddy.
@@ -1011,6 +1056,10 @@ signal_handler() {
 ##
 cleanup() {
     if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
+        if is_not_empty "${global_patched_macos_sierra_installer_application_path-}"; then
+            restore_info_plist_in_macos_sierra_installer_application "${global_patched_macos_sierra_installer_application_path}" && unset global_patched_macos_sierra_installer_application_path
+        fi
+
         detach_for_cleanup "global_install_esd_mountpoint"
         detach_for_cleanup "global_install_disk_mountpoint"
         detach_for_cleanup "global_install_disk_device_node"
@@ -1115,7 +1164,7 @@ print_error_usage() {
     print_error "Arguments"
     print_error "--isodirectory, A path to a directory where the installer ISO image file will be created."
     print_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
-    print_error "--nointeraction, Delete an existing ISO image file without prompting for confirmation."
+    print_error "--nointeraction, Delete an existing ISO image file and/or patch a defective macOS Sierra installer application without prompting for confirmation."
     print_error
     print_error "Example: ${const_script_name} --isodirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
 
@@ -1540,22 +1589,22 @@ is_valid_installer_application_path() {
 }
 
 ##
-## @brief      Determines whether the installer application is a macOS
-##             Sierra installer application version which contains a
-##             broken 'createinstallmedia' command.
+## @brief      Determines whether an installer application is the
+##             defective macOS Sierra installer application.
 ##
 ## @param      $1       An installer application path to be checked.
 ##
-## @retval     `true`   Invalid macOS Sierra installer application.
+## @retval     `true`   The installer application is the defective macOS
+##                      Sierra installer application.
 ## @retval     `false`  Otherwise.
 ##
-is_invalid_macos_sierra_installer_application() {
+is_defective_macos_sierra_installer_application() {
     local -r installer_application_path="$1"
     local installer_application_short_version_string
 
     installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 0
 
-    [[ "${installer_application_short_version_string}" == "12.6.06" ]]
+    [[ "${installer_application_short_version_string}" == "${const_defective_macos_sierra_installer_application_short_version_string}" ]]
 }
 
 ##
@@ -1803,6 +1852,61 @@ get_installer_application_short_version_string()
     is_not_empty "${installer_application_path}" || return 1
 
     get_plist_value ":CFBundleShortVersionString" "${installer_application_path}/Contents/Info.plist"
+}
+
+##
+## @brief      Sets the 'short version string' of an installer
+##             application.
+##
+## @param      $1    The path to an installer application.
+## @param      $2    The new value for the 'short version string'.
+##
+set_installer_application_short_version_string()
+{
+    local -r installer_application_path="$1"
+    local -r value="$2"
+
+    is_not_empty "${installer_application_path}" || return 1
+    is_not_empty "${value}" || return 1
+
+    set_plist_value ":CFBundleShortVersionString" "${value}" "${installer_application_path}/Contents/Info.plist"
+}
+
+##
+## @brief      Patches the Info.plist file in the defective macOS Sierra
+##             installer application and sets the installer application
+##             path in a global variable for cleanup.
+##
+## @param      $1    The path to the defective macOS Sierra installer
+##                   application.
+##
+patch_info_plist_in_macos_sierra_installer_application()
+{
+    local -r installer_application_path="$1"
+
+    is_not_empty "${installer_application_path}" || return 1
+
+    mkdir -p "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}" || return 1
+    cp -p "${installer_application_path}/Contents/Info.plist" "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}/" || return 1
+    set_installer_application_short_version_string "${installer_application_path}" "${const_patched_macos_sierra_installer_application_short_version_string}" || return 1
+    global_patched_macos_sierra_installer_application_path="${installer_application_path}"
+}
+
+##
+## @brief      Restores the Info.plist file in the defective macOS
+##             Sierra installer application to the state before it was
+##             patched.
+##
+## @param      $1    The path to the defective macOS Sierra installer
+##                   application.
+##
+restore_info_plist_in_macos_sierra_installer_application()
+{
+    local -r installer_application_path="$1"
+
+    is_not_empty "${installer_application_path}" || return 1
+
+    cp -p "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}/Info.plist" "${installer_application_path}/Contents/Info.plist"
 }
 
 ##
