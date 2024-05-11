@@ -115,8 +115,9 @@ declare -r -a const_known_macos_names_and_version_strings_regex=(
     '^14\.[[:digit:]]+(\.[[:digit:]+])?$ # macOS Sonoma'          # 14
 )
 
-# Make sure that macOS Big Sur reports 11 as the macOS version instead
-# of 10.16.
+# Ensures that 'sw_vers' uses Apple's new naming scheme for macOS
+# versions. E.g. macOS Big Sur reports version 11.x.y instead of
+# 10.16.x.
 unset SYSTEM_VERSION_COMPAT
 
 unset global_tmp_directory
