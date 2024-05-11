@@ -10,9 +10,9 @@ Creates a bootable ISO image from a macOS installer application. This image can 
 4. [Installation](#user-content-installation)
 5. [Usage](#user-content-usage)
     1. [Command line arguments](#user-content-command-line-arguments)
-    2. [Example for the macOS Catalina installer](#user-content-example-for-the-macos-catalina-installer)
+    2. [Example](#user-content-example)
 6. [Troubleshooting](#user-content-troubleshooting)
-    1. [Alert during macOS installation from ISO image](#user-content-alert-during-macos-installation-from-iso-image)
+    1. [Alert during macOS installation](#user-content-alert-during-macos-installation)
     2. [Install macOS Sierra (Version 12.6.06)](#user-content-install-macos-sierra--version-12-6-06-)
 7. [References](#user-content-references)
     1. [Installer application types](#user-content-installer-application-types)
@@ -155,7 +155,7 @@ If you want to suppress user interactions when running the command and always al
 
 * `--nointeraction` (or `-n`) which causes an existing ISO image file to be overwritten and/or patch a defective macOS Sierra installer application without prompting for confirmation.
 
-### Example for the macOS Catalina installer
+### Example
 
 The following example show the steps required to create an ISO image from a macOS Catalina installer:
 
@@ -173,7 +173,7 @@ The following example show the steps required to create an ISO image from a macO
 
 ## Troubleshooting
 
-### Alert during macOS installation from ISO image
+### Alert during macOS installation
 
 If you try to install macOS using the ISO image you created, you may see an alert that says the application can't be verified and may have been corrupted or tampered with during downloading. Or it says that the package was signed with a certificate that has expired and may not be authentic (see: [If an installer says it can't be verified or was signed with a certificate that has expired](https://support.apple.com/en-us/100622)).
 
