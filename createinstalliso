@@ -1886,6 +1886,7 @@ patch_info_plist_in_macos_sierra_installer_application()
     local -r installer_application_path="$1"
 
     is_not_empty "${installer_application_path}" || return 1
+    is_not_empty "${global_tmp_directory-}" || return 1
 
     mkdir -p "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}" || return 1
     cp -p "${installer_application_path}/Contents/Info.plist" "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}/" || return 1
@@ -1906,6 +1907,7 @@ restore_info_plist_in_macos_sierra_installer_application()
     local -r installer_application_path="$1"
 
     is_not_empty "${installer_application_path}" || return 1
+    is_not_empty "${global_tmp_directory-}" || return 1
 
     cp -p "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}/Info.plist" "${installer_application_path}/Contents/Info.plist"
 }
