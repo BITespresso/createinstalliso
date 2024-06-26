@@ -963,7 +963,7 @@ execute_plist_buddy_command() {
 }
 
 ##
-## @brief      Removes all leading and tailing whitespaces from a
+## @brief      Removes all leading and trailing whitespaces from a
 ##             string.
 ##
 ## @param      $1    A string.
