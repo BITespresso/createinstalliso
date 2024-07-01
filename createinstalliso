@@ -863,6 +863,7 @@ get_item_starting_with_string() {
             return 0
         fi
     done
+
     return 1
 }
 
