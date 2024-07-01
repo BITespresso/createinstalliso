@@ -814,9 +814,10 @@ matches_array_item_regex() {
 }
 
 ##
-## @brief      Gets the absolute logical path to a file or directory.
+## @brief      Gets the absolute logical path to an existing file or
+##             directory.
 ##
-## @param      $1    An absolute or relative path to a file or
+## @param      $1    An absolute or relative path to an existing file or
 ##                   directory.
 ##
 ## @return     The absolute logical (i.e. not the physical) path to the
