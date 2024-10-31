@@ -13,7 +13,6 @@ Creates a bootable ISO image from a macOS installer application. This image can 
     2. [Example](#user-content-example)
 6. [Troubleshooting](#user-content-troubleshooting)
     1. [Alert during macOS installation](#user-content-alert-during-macos-installation)
-    2. [Install macOS Sierra (Version 12.6.06)](#user-content-install-macos-sierra--version-12-6-06-)
 7. [References](#user-content-references)
     1. [Installer application types](#user-content-installer-application-types)
     2. [Required external commands](#user-content-required-external-commands)
@@ -153,7 +152,7 @@ The name of the ISO image to be created is made up of the name of the installer 
 
 If you want to suppress user interactions when running the command and always allow the required actions, you can add the option:
 
-* `--nointeraction` (or `-n`) which causes an existing ISO image file to be overwritten and/or patch a defective macOS Sierra installer application without prompting for confirmation.
+* `--nointeraction` (or `-n`) causes an existing ISO image file to **always** be overwritten.
 
 ### Example
 
@@ -186,12 +185,6 @@ To manually set the system date to a value in the past, perform the following st
 * Type `date 100800002019` into Terminal, then press Return. This sets the system date to October 8, 2019, 0:00 am.
 * Quit Terminal and resume the macOS installation.
 
-### Install macOS Sierra (Version 12.6.06)
-
-When Apple released this particular macOS Sierra installer application, a bug was introduced that causes the included `createinstallmedia` command to fail with an error message about an invalid mount point. Thanks to [Eric Knibbe](https://github.com/EricFromCanada) this bug can easily be fixed by changing the value for `CFBundleShortVersionString` from `12.6.06` to `12.6.03` in the file `Info.plist` (see: [#4](https://github.com/BITespresso/createinstalliso/issues/4)).
-
-If **createinstalliso** detects this defective version of the macOS Sierra installer application, it will offer you to temporarily patch the `Info.plist` file by applying the above change. The original `Info.plist` will be automatically restored when **createinstalliso** terminates. This requires, of course, that the installer is on a writable medium.
-
 ## References
 
 ### Installer application types
@@ -218,7 +211,33 @@ The installer application types are:
 
 ### Required external commands
 
-**createinstalliso** uses a number of external commands, which must be available on your system: `awk`, `bless`, `cp`, `cut`, `df`, `du`, `hdiutil`, `mktemp`, `ps`, `pwd`, `rm`, `script`, `seq`, `stat`, `sw_vers`, `tput`, `uname` and `/usr/libexec/PlistBuddy`.
+**createinstalliso** uses a number of external commands, which must be available on your system:
+
+- `awk`
+- `bless`
+- `codesign`
+- `cp`
+- `cut`
+- `df`
+- `ditto`
+- `du`
+- `file`
+- `grep`
+- `hdiutil`
+- `mktemp`
+- `ps`
+- `pwd`
+- `rm`
+- `rsync`
+- `script`
+- `seq`
+- `stat`
+- `sw_vers`
+- `sysctl`
+- `tput`
+- `uname`
+- `xattr`
+- `/usr/libexec/PlistBuddy`.
 
 Unless you have deliberately modified your system, all of the above commands are available on the macOS versions listed in the section "[Compatibility](#user-content-compatibility)".
 
@@ -271,7 +290,11 @@ The table below lists all possible exit status and corresponding messages:
 | 223    | Failed to create ISO image.                                                           |
 | 222    | \[NOT USED SINCE 1.1\]                                                                |
 | 221    | Couldn't get installer application minimum macOS version.                             |
-| 220    | Failed to patch the file \[FILE\], is write-protected?                                |
+| 220    | Failed to copy installer application.                                                 |
+| 219    | Failed to remove extended attribute com.apple.quarantine.                             |
+| 218    | Failed to patch macOS Sierra installer application.                                   |
+| 217    | Failed to replace code signatures.                                                    |
+| 216    | Failed to replace modified files with original ones.                                  |
 
 ## License
 

@@ -29,9 +29,6 @@ fi
 declare -r const_script_name="createinstalliso"
 declare -r const_minimum_required_macos_version_string="10.6"
 declare -r -i const_root_uid=0
-declare -r const_defective_macos_sierra_installer_application_short_version_string="12.6.06"
-declare -r const_patched_macos_sierra_installer_application_short_version_string="12.6.03"
-declare -r const_macos_sierra_installer_application_info_plist_directory="Install macOS Sierra.app/Contents"
 
 # List of unsupported macOS versions.
 #
@@ -69,10 +66,10 @@ declare -r -a const_supported_macos_version_strings_regex=(
 
 # List of all supported installer applications and their disk space
 # offset requirements for the installer application types '3' and '4'
-# (see 'get_offset_for_global_tmp_directory' and
-# 'get_offset_for_iso_directory_path'). The disk space offset
-# requirements must each be separated by the '#' character each. The
-# disk space offset requirements are specified in millions of bytes.
+# (see 'get_offset_for_tmp_directory' and
+# 'get_offset_for_iso_directory_path'). The columns are separated by the
+# '#' character. The disk space offset requirements are specified in
+# millions of bytes.
 declare -r -a const_supported_installer_application_display_names_and_offsets=(
     'Install Mac OS X Lion      #      #     ' # 10.7
     'Install OS X Mountain Lion #      #     ' # 10.8
@@ -90,8 +87,7 @@ declare -r -a const_supported_installer_application_display_names_and_offsets=(
 )
 
 # List of all known macOS version names and their corresponding version
-# string regex. The regex expression and the macOS version name must
-# be separated by the '#' character.
+# string regex. The columns are separated by the '#' character.
 declare -r -a const_known_macos_names_and_version_strings_regex=(
     '^10\.0(\.[[:digit:]+])?$            # Mac OS X Cheetah'      # 10.0
     '^10\.1(\.[[:digit:]+])?$            # Mac OS X Puma'         # 10.1
@@ -115,13 +111,18 @@ declare -r -a const_known_macos_names_and_version_strings_regex=(
     '^14\.[[:digit:]]+(\.[[:digit:]+])?$ # macOS Sonoma'          # 14
 )
 
+declare global_patch_macos_sierra_installer_application="false"
+declare global_replace_code_signatures_in_installer_application="false"
+
 # Ensures that 'sw_vers' uses Apple's new naming scheme for macOS
 # versions. E.g. macOS Big Sur reports version 11.x.y instead of
 # 10.16.x.
 unset SYSTEM_VERSION_COMPAT
 
+# Ensures that 'ditto' does not automatically add some options.
+unset DITTONORSRC
+
 unset global_tmp_directory
-unset global_patched_macos_sierra_installer_application_path
 unset global_install_esd_mountpoint
 unset global_install_disk_mountpoint
 unset global_install_disk_device_node
@@ -306,6 +307,8 @@ main() {
     # ------------------------------------------------------------------
 
     local installer_application_path
+    local original_installer_application_path
+    local installer_application_basename
     local iso_directory_path
     local installer_application_display_name
     local -i installer_application_type
@@ -313,6 +316,8 @@ main() {
     local random_string
 
     installer_application_path="$(get_absolute_logical_path "${option_applicationpath}")" || exit_with_status 244 "Couldn't get absolute path for ${option_applicationpath}."
+    original_installer_application_path="${installer_application_path}"
+    installer_application_basename="$(get_basename "${installer_application_path}")"
     iso_directory_path="$(get_absolute_logical_path "${option_isodirectory}")" || exit_with_status 243 "Couldn't get absolute path for ${option_isodirectory}."
 
     installer_application_display_name="$(get_installer_application_display_name "${installer_application_path}")" || exit_with_status 242 "Couldn't get installer application display name."
@@ -341,25 +346,24 @@ main() {
         exit_with_status 238 "You need ${macos_name_and_version} or later to create an ISO image from this installer application."
     fi
 
+    if is_defective_macos_sierra_installer_application "${installer_application_path}" "${installer_application_display_name}"; then
+        global_patch_macos_sierra_installer_application="true"
+    fi
+
+    if is_apple_silicon_mac && is_createinstallmedia_required "${installer_application_type}" && ! is_mach_o_arm64_executable "${installer_application_path}/Contents/Resources/createinstallmedia"; then
+        # This flag may only be set to 'true' if the 'codesign' command
+        # supports the '--sign -' and '--force' options. Here we can be
+        # sure that we are dealing with an Apple silicon Mac and are
+        # therefore using macOS Big Sur or higher, all of which support
+        # these options.
+        global_replace_code_signatures_in_installer_application="true"
+    fi
+
     # ------------------------------------------------------------------
     # Perform required user interactions
     # ------------------------------------------------------------------
 
     local type_of_existing_destination
-
-    if [[ "${installer_application_display_name}" == "Install macOS Sierra" ]] && is_defective_macos_sierra_installer_application "${option_applicationpath}"; then
-        if [[ "${option_nointeraction}" != "true" ]]; then
-            echo "${installer_application_path} is a defective macOS Sierra installer application."
-            echo "To continue we need to temporarily patch the file ${installer_application_path}/Contents/Info.plist."
-
-            if ! get_user_consent "If you wish to continue type (Y) then press return: "; then
-                echo "Operation canceled."
-                exit_with_status 0
-            fi
-        fi
-
-        patch_info_plist_in_macos_sierra_installer_application "${installer_application_path}" || exit_with_status 220 "Failed to patch the file ${installer_application_path}/Contents/Info.plist, is write-protected?"
-    fi
 
     if is_existing "${iso_destination_image}"; then
         if is_file "${iso_destination_image}"; then
@@ -385,17 +389,25 @@ main() {
     # Check available disk space
     # ------------------------------------------------------------------
 
-    local -i available_in_global_tmp_directory
-    local -i available_in_iso_directory_path
-    local -i required_in_global_tmp_directory
-    local -i required_in_iso_directory_path
-    local -i offset_for_global_tmp_directory
-    local -i offset_for_iso_directory_path
-    local -i missing_in_global_tmp_directory
-    local -i missing_in_iso_directory_path
+    local -i available_in_tmp_directory
+    local -i available_in_iso_directory
 
-    available_in_global_tmp_directory="$(get_available_disk_space "${global_tmp_directory}")" || return 1
-    available_in_iso_directory_path="$(get_available_disk_space "${iso_directory_path}")" || return 1
+    local -i required_for_modified_installer_application
+    local -i required_for_iso_image
+
+    local -i required_in_tmp_directory
+    local -i required_in_iso_directory
+
+    local -i offset_for_tmp_directory
+    local -i offset_for_iso_image
+
+    local -i missing_in_tmp_directory
+    local -i missing_in_iso_directory
+
+    (( available_in_tmp_directory = $(get_available_disk_space "${global_tmp_directory}") ))
+    (( available_in_iso_directory = $(get_available_disk_space "${iso_directory_path}") ))
+
+    (( required_for_modified_installer_application = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
 
     case "${installer_application_type}" in
 
@@ -403,9 +415,10 @@ main() {
         # - Mac OS X Lion 10.7
         # - OS X Mountain Lion 10.8
         1 )
-            (( required_in_global_tmp_directory = 0 ))
+            (( required_in_tmp_directory = 0 ))
 
-            (( required_in_iso_directory_path = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
+            (( required_for_iso_image = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
+            (( required_in_iso_directory = required_for_iso_image ))
             ;;
 
         # Installer application type '2' for:
@@ -413,11 +426,12 @@ main() {
         # - OS X Yosemite 10.10
         # - OS X El Capitan 10.11
         2 )
-            (( required_in_global_tmp_directory = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") ))
-            (( required_in_global_tmp_directory = required_in_global_tmp_directory + (required_in_global_tmp_directory * 16 / 100) + 360000000 ))
+            (( required_in_tmp_directory = $(get_disk_image_total_non_empty_bytes "${installer_application_path}/Contents/SharedSupport/InstallESD.dmg") * 16 / 100 ))
+            (( required_in_tmp_directory += 360000000 ))
 
-            (( required_in_iso_directory_path = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
-            (( required_in_iso_directory_path = required_in_iso_directory_path + 1460000000 ))
+            (( required_for_iso_image = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_for_iso_image += 1460000000 ))
+            (( required_in_iso_directory = required_for_iso_image ))
             ;;
 
         # Installer application type '3' for:
@@ -434,37 +448,72 @@ main() {
         # - macOS Ventura 13
         # - macOS Sonoma 14
         3 | 4 )
-            (( required_in_global_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
-            offset_for_global_tmp_directory="$(get_offset_for_global_tmp_directory "${installer_application_display_name}")" || offset_for_global_tmp_directory=0
-            (( offset_for_global_tmp_directory = offset_for_global_tmp_directory * 1000000 ))
-            (( required_in_global_tmp_directory = required_in_global_tmp_directory + offset_for_global_tmp_directory ))
+            (( offset_for_tmp_directory = $(get_offset_for_tmp_directory "${installer_application_display_name}") )) || offset_for_tmp_directory=0
+            (( required_in_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_in_tmp_directory += offset_for_tmp_directory * 1000000 ))
 
-            (( required_in_iso_directory_path = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
-            offset_for_iso_directory_path="$(get_offset_for_iso_directory_path "${installer_application_display_name}")" || offset_for_iso_directory_path=0
-            (( offset_for_iso_directory_path = offset_for_iso_directory_path * 1000000 ))
-            (( required_in_iso_directory_path = required_in_iso_directory_path + offset_for_iso_directory_path ))
+            (( offset_for_iso_image = $(get_offset_for_iso_directory_path "${installer_application_display_name}") )) || offset_for_iso_image=0
+            (( required_for_iso_image = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
+            (( required_for_iso_image += offset_for_iso_image * 1000000 ))
+            (( required_in_iso_directory = required_for_iso_image ))
             ;;
 
     esac
 
     if are_one_same_device "${global_tmp_directory}" "${iso_directory_path}"; then
-        (( missing_in_global_tmp_directory = (required_in_global_tmp_directory + required_in_iso_directory_path) - available_in_global_tmp_directory ))
+        if is_modification_of_installer_application_required; then
+            (( required_in_tmp_directory += $(max "${required_for_modified_installer_application}" "${required_in_iso_directory}") ))
+        else
+            (( required_in_tmp_directory += required_in_iso_directory ))
+        fi
 
-        if (( missing_in_global_tmp_directory > 0 )); then
-            exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files and installer ISO image" "${missing_in_global_tmp_directory}"
+        (( missing_in_tmp_directory = required_in_tmp_directory - available_in_tmp_directory ))
+
+        if (( missing_in_tmp_directory > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files and installer ISO image" "${missing_in_tmp_directory}"
         fi
     else
-        (( missing_in_global_tmp_directory = required_in_global_tmp_directory - available_in_global_tmp_directory ))
-
-        if (( missing_in_global_tmp_directory > 0 )); then
-            exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files" "${missing_in_global_tmp_directory}"
+        if is_modification_of_installer_application_required; then
+            (( required_in_tmp_directory += required_for_modified_installer_application ))
         fi
 
-        (( missing_in_iso_directory_path = required_in_iso_directory_path - available_in_iso_directory_path ))
+        (( missing_in_tmp_directory = required_in_tmp_directory - available_in_tmp_directory ))
 
-        if (( missing_in_iso_directory_path > 0 )); then
-            exit_with_missing_disk_space "$(get_volume_name "${iso_directory_path}")" "installer ISO image" "${missing_in_iso_directory_path}"
+        if (( missing_in_tmp_directory > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${global_tmp_directory}")" "temporary files" "${missing_in_tmp_directory}"
         fi
+
+        (( missing_in_iso_directory = required_in_iso_directory - available_in_iso_directory ))
+
+        if (( missing_in_iso_directory > 0 )); then
+            exit_with_missing_disk_space "$(get_volume_name "${iso_directory_path}")" "installer ISO image" "${missing_in_iso_directory}"
+        fi
+    fi
+
+    # ------------------------------------------------------------------
+    # Modify installer application (if required)
+    # ------------------------------------------------------------------
+
+    local modified_installer_application_path
+
+    if is_modification_of_installer_application_required; then
+        modified_installer_application_path="${global_tmp_directory}/InstallerApplication/${installer_application_basename}"
+
+        echo "Copying installer application..."
+        ditto "${original_installer_application_path}" "${modified_installer_application_path}" >/dev/null || exit_with_status 220 "Failed to copy installer application."
+        xattr -drs "com.apple.quarantine" "${modified_installer_application_path}" >/dev/null || exit_with_status 219 "Failed to remove extended attribute com.apple.quarantine."
+
+        if [[ "${global_patch_macos_sierra_installer_application}" == "true" ]]; then
+            echo "Patching macOS Sierra installer application..."
+            set_installer_application_short_version_string "${modified_installer_application_path}" "12.6.03" || exit_with_status 218 "Failed to patch macOS Sierra installer application."
+        fi
+
+        if [[ "${global_replace_code_signatures_in_installer_application}" == "true" ]]; then
+            echo "Replacing existing code signatures..."
+            replace_code_signatures "${modified_installer_application_path}" || exit_with_status 217 "Failed to replace code signatures."
+        fi
+
+        installer_application_path="${modified_installer_application_path}"
     fi
 
     # ------------------------------------------------------------------
@@ -473,7 +522,6 @@ main() {
 
     local iso_source_image
     local install_esd_image
-    local install_esd_shadow
     local base_system_image
     local install_disk_image
     local install_disk_volname
@@ -554,6 +602,17 @@ main() {
             hdiutil detach "${global_install_disk_device_node}" -force >/dev/null || exit_with_status 226 "Couldn't unmount disk image."
             unset global_install_disk_device_node
 
+            if is_modification_of_installer_application_required; then
+                rm -rf "${modified_installer_application_path}" >/dev/null || true
+                global_install_disk_mountpoint="${global_tmp_directory}/InstallDisk"
+                hdiutil attach "${install_disk_image}" -readwrite -mountpoint "${global_install_disk_mountpoint}" -nobrowse -noverify >/dev/null || exit_with_status 232 "The disk image did not mount."
+
+                rsync -a "${original_installer_application_path}" "${global_install_disk_mountpoint}" || exit_with_status 216 "Failed to replace modified files with original ones."
+
+                hdiutil detach "${global_install_disk_mountpoint}" -force >/dev/null || exit_with_status 226 "Couldn't unmount disk image."
+                unset global_install_disk_mountpoint
+            fi
+
             iso_source_image="${install_disk_image}"
             ;;
 
@@ -599,6 +658,23 @@ echo_n() {
 }
 
 ##
+## @brief      Gets the basename of a file or directory.
+##
+## @param      $1    A file or directory.
+##
+## @return     The basename of the file or directory.
+##
+get_basename() {
+    local -r file_or_directory="$1"
+    local basename
+
+    basename="${file_or_directory%/}"
+    basename="${basename##*/}"
+
+    echo "${basename}"
+}
+
+##
 ## @brief      Gets the name of the current operating system.
 ##
 ## @return     The operating system name.
@@ -609,6 +685,61 @@ get_os_name() {
     os_name="$(uname -s 2>/dev/null)" || return 1
 
     echo "${os_name}"
+}
+
+##
+## @brief      Gets a space-delimited list of the architectures of all
+##             Mach-O executables in the specified file.
+##
+## @param      $1    A file.
+##
+## @return     The space-delimited list of Mach-O executable
+##             architectures.
+##
+get_mach_o_executable_architectures() {
+    local -r file="$1"
+    local file_output_with_colon_separator
+    local file_output_with_space_separator
+    local -i output_length
+    local -i i
+    local file_path_in_output
+    local file_output_without_file_path
+    local file_output_line_without_file_path
+    local -a executable_architectures=()
+
+    is_not_empty "${file}" || return 1
+    is_file "${file}" || return 1
+
+    file_output_with_colon_separator="$(file --separator ":" "${file}")"
+    file_output_with_space_separator="$(file --separator " " "${file}")"
+    output_length="${#file_output_with_colon_separator}"
+
+    # Search for the first character that differs in both strings
+    for (( i = 0; i < output_length; i++ )); do
+        if [[ "${file_output_with_colon_separator:${i}:1}" != "${file_output_with_space_separator:${i}:1}" ]]; then
+            break
+        fi
+    done
+
+    file_path_in_output="${file_output_with_colon_separator:0:${i}}"
+
+    # Remove all occurrences of the file path in the output of the 'file'
+    # command to avoid unexpected characters in the output.
+    file_output_without_file_path="${file_output_with_colon_separator//"${file_path_in_output}"/}"
+
+    if is_mach_o_universal_binary "${file_output_without_file_path}"; then
+        while IFS= read -r file_output_line_without_file_path; do
+            if is_mach_o_executable "${file_output_line_without_file_path}"; then
+                executable_architectures+=("${file_output_line_without_file_path##* }")
+            fi
+        done <<<"${file_output_without_file_path#*$'\n'}"
+    else
+        if is_mach_o_executable "${file_output_without_file_path}"; then
+            executable_architectures+=("${file_output_without_file_path##* }")
+        fi
+    fi
+
+    IFS=' ' echo "${executable_architectures[@]}"
 }
 
 ##
@@ -691,6 +822,44 @@ get_root_volume_name() {
 }
 
 ##
+## @brief      Determines whether this machine is an Apple silicon Mac.
+##
+## @retval     `true`   The machine is an Apple silicon Mac.
+## @retval     `false`  Otherwise.
+##
+is_apple_silicon_mac() {
+    [[ "$(sysctl -n hw.optional.arm64 2>/dev/null)" == "1" ]]
+}
+
+##
+## @brief      Determines whether the output of the 'file' command (with
+##             the file path portions removed) contains the file type
+##             'Mach-O universal binary'.
+##
+## @param      $1    A single output line from the 'file' command with
+##                   the file path portion removed.
+##
+is_mach_o_universal_binary() {
+    local -r file_output_without_file_path="$1"
+
+    echo "${file_output_without_file_path%%$'\n'*}" | grep -E "^:[[:space:]]+Mach-O universal binary with [0-9]+ architectures" >/dev/null
+}
+
+##
+## @brief      Determines whether an output line of the 'file' command
+##             (with the file path portion removed) contains the file
+##             type 'Mach-O executable'.
+##
+## @param      $1    A single output line from the 'file' command with
+##                   the file path portion removed.
+##
+is_mach_o_executable() {
+    local -r file_output_line_without_file_path="$1"
+
+    echo "${file_output_line_without_file_path}" | grep -E "Mach-O( 64-bit | )executable [^ ]+$" >/dev/null
+}
+
+##
 ## @brief      Determines whether an operating system is macOS.
 ##
 ## @param      $1       A name of an operating system as output by
@@ -760,21 +929,6 @@ is_directory() {
 }
 
 ##
-## @brief      Determines whether the specified file exists and the user
-##             has write access.
-##
-## @param      $1       The file to be checked.
-##
-## @retval     `true`   The file exists and the user has write access.
-## @retval     `false`  Otherwise.
-##
-is_writable() {
-    local -r file_or_directory="$1"
-
-    [[ -f "${file_or_directory}" ]]
-}
-
-##
 ## @brief      Determines whether the specified string is not empty.
 ##
 ## @param      $1       The string to be checked.
@@ -811,6 +965,23 @@ matches_array_item_regex() {
         fi
     done
     return 1
+}
+
+##
+## @brief      Returns the maximum of two integer numbers.
+##
+## @param      $1    An integer.
+## @param      $2    Another integer.
+##
+## @return     The maximum of the two integer numbers.
+##
+max() {
+    local -r -i m="$1"
+    local -r -i n="$2"
+
+    echo "$(( m > n ? m : n ))"
+
+    return 0
 }
 
 ##
@@ -1059,10 +1230,6 @@ signal_handler() {
 ##
 cleanup() {
     if is_not_empty "${global_tmp_directory-}" && is_existing "${global_tmp_directory}"; then
-        if is_not_empty "${global_patched_macos_sierra_installer_application_path-}"; then
-            restore_info_plist_in_macos_sierra_installer_application "${global_patched_macos_sierra_installer_application_path}" && unset global_patched_macos_sierra_installer_application_path
-        fi
-
         detach_for_cleanup "global_install_esd_mountpoint"
         detach_for_cleanup "global_install_disk_mountpoint"
         detach_for_cleanup "global_install_disk_device_node"
@@ -1167,7 +1334,7 @@ print_error_usage() {
     print_error "Arguments"
     print_error "--isodirectory, A path to a directory where the installer ISO image file will be created."
     print_error "--applicationpath, A path to copy of the OS installer application to create the bootable ISO image from."
-    print_error "--nointeraction, Delete an existing ISO image file and/or patch a defective macOS Sierra installer application without prompting for confirmation."
+    print_error "--nointeraction, Delete an existing ISO image file without prompting for confirmation."
     print_error
     print_error "Example: ${const_script_name} --isodirectory ~/Desktop/ --applicationpath \"/Applications/$(create_example_installer_application_name)\""
 
@@ -1596,6 +1763,8 @@ is_valid_installer_application_path() {
 ##             defective macOS Sierra installer application.
 ##
 ## @param      $1       An installer application path to be checked.
+## @param      $2       An installer application display name to be
+##                      checked (e.g. 'Install macOS Sierra').
 ##
 ## @retval     `true`   The installer application is the defective macOS
 ##                      Sierra installer application.
@@ -1603,11 +1772,70 @@ is_valid_installer_application_path() {
 ##
 is_defective_macos_sierra_installer_application() {
     local -r installer_application_path="$1"
+    local -r installer_application_display_name="$2"
     local installer_application_short_version_string
 
-    installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 0
+    [[ "${installer_application_display_name}" == "Install macOS Sierra" ]] || return 1
+    installer_application_short_version_string="$(get_installer_application_short_version_string "${installer_application_path}")" || return 1
 
-    [[ "${installer_application_short_version_string}" == "${const_defective_macos_sierra_installer_application_short_version_string}" ]]
+    [[ "${installer_application_short_version_string}" == "12.6.06" ]]
+}
+
+##
+## @brief      Determines whether a file contains a Mach-O executable
+##             for the 'arm64' architecture.
+##
+## @param      $1       A file.
+##
+## @retval     `true`   The file contains a Mach-O executable for the
+##                      'arm64' architecture.
+## @retval     `false`  Otherwise.
+##
+is_mach_o_arm64_executable() {
+    local -r file="$1"
+    local -r arm64_regex='[[:<:]]arm64[[:>:]]'
+
+    # Check whether the list of architectures contains 'arm64' at word
+    # boundaries.
+    [[ "$(get_mach_o_executable_architectures "${file}")" =~ $arm64_regex ]]
+}
+
+##
+## @brief      Determines whether an installer application type requires
+##             'createinstallmedia' for the creation of the bootable ISO
+##             image.
+##
+## @param      $1       An installer application type (e.g. '3').
+##
+## @retval     `true`   The installer application type requires
+##                      'createinstallmedia'.
+## @retval     `false`  Otherwise.
+##
+is_createinstallmedia_required() {
+    local -r installer_application_type="$1"
+
+    case "${installer_application_type}" in
+        0 | 1 | 2 )
+            return 1
+            ;;
+
+        3 | 4 | * )
+            return 0
+            ;;
+
+    esac
+}
+
+##
+## @brief      Determines whether a modification of the installer
+##             application is required.
+##
+## @retval     `true`   A modification of the installer application is
+##                      required.
+## @retval     `false`  Otherwise.
+##
+is_modification_of_installer_application_required() {
+    [[ ("${global_patch_macos_sierra_installer_application}" == "true") || ("${global_replace_code_signatures_in_installer_application}" == "true") ]]
 }
 
 ##
@@ -1794,13 +2022,13 @@ get_disk_image_total_non_empty_bytes() {
 
 ##
 ## @brief      Gets the offset for the required disk space on the volume
-##             where the global temporary directory is located.
+##             where the temporary directory is located.
 ##
 ## @param      $1    The installer application display name.
 ##
 ## @return     The offset in bytes.
 ##
-get_offset_for_global_tmp_directory() {
+get_offset_for_tmp_directory() {
     local -r installer_application_display_name="$1"
     local item
 
@@ -1873,45 +2101,6 @@ set_installer_application_short_version_string()
     is_not_empty "${value}" || return 1
 
     set_plist_value ":CFBundleShortVersionString" "${value}" "${installer_application_path}/Contents/Info.plist"
-}
-
-##
-## @brief      Patches the Info.plist file in the defective macOS Sierra
-##             installer application and sets the installer application
-##             path in a global variable for cleanup.
-##
-## @param      $1    The path to the defective macOS Sierra installer
-##                   application.
-##
-patch_info_plist_in_macos_sierra_installer_application()
-{
-    local -r installer_application_path="$1"
-
-    is_not_empty "${installer_application_path}" || return 1
-    is_not_empty "${global_tmp_directory-}" || return 1
-
-    mkdir -p "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}" || return 1
-    cp -p "${installer_application_path}/Contents/Info.plist" "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}/" || return 1
-    set_installer_application_short_version_string "${installer_application_path}" "${const_patched_macos_sierra_installer_application_short_version_string}" || return 1
-    global_patched_macos_sierra_installer_application_path="${installer_application_path}"
-}
-
-##
-## @brief      Restores the Info.plist file in the defective macOS
-##             Sierra installer application to the state before it was
-##             patched.
-##
-## @param      $1    The path to the defective macOS Sierra installer
-##                   application.
-##
-restore_info_plist_in_macos_sierra_installer_application()
-{
-    local -r installer_application_path="$1"
-
-    is_not_empty "${installer_application_path}" || return 1
-    is_not_empty "${global_tmp_directory-}" || return 1
-
-    cp -p "${global_tmp_directory}/${const_macos_sierra_installer_application_info_plist_directory}/Info.plist" "${installer_application_path}/Contents/Info.plist"
 }
 
 ##
@@ -2022,6 +2211,10 @@ create_install_media() {
 
     is_not_empty "${installer_application_path}" || return 1
     is_not_empty "${install_disk_volname}" || return 1
+
+    if [[ "${global_replace_code_signatures_in_installer_application}" == "true" ]]; then
+        echo "Verifying installer application..."
+    fi
 
     if has_applicationpath_option "${installer_application_path}"; then
         applicationpath_option_name="--applicationpath"
@@ -2182,6 +2375,30 @@ script_createinstallmedia_canceled_by_sigquit() {
     local -r -i exit_status="$1"
 
     [[ "${exit_status}" -eq 3 ]]
+}
+
+##
+## @brief      Replaces an existing code signature of all regular files
+##             in the installer application path with an adhoc
+##             signature.
+##
+## @param      $1    The path to an installer application.
+##
+replace_code_signatures() {
+    local -r installer_application_path="$1"
+    local file
+    local -i exit_status
+
+    find "${installer_application_path}" -type f -print0 | while IFS= read -r -d "" file; do
+        # Check if file has a code signature
+        codesign -d "${file}" >/dev/null 2>&1
+        exit_status="$?"
+
+        # Replace existing code signature with adhoc signature
+        if [[ "${exit_status}" -eq 0 ]]; then
+            codesign --sign - --force "${file}" >/dev/null 2>&1 || return 1
+        fi
+    done
 }
 
 ##
