@@ -1524,7 +1524,7 @@ exit_missing_option_parameter_for_option() {
 ## @param      $1    The long option as provided on the command line
 ##                   (including leading '--').
 ##
-exit_no_option_parameter_allowed_for_long_option(){
+exit_no_option_parameter_allowed_for_long_option() {
     local -r long_option="$1"
 
     print_error "${const_script_name}: option \`${long_option}' doesn't allow an argument"
@@ -1904,8 +1904,7 @@ get_installer_application_display_name() {
 ##
 ## @return     The type of the installer application.
 ##
-get_installer_application_type()
-{
+get_installer_application_type() {
     local -r installer_application_path="$1"
     local -i installer_application_type=0
 
@@ -2076,8 +2075,7 @@ get_installer_application_minimum_system_version() {
 ##
 ## @return     The installer application 'short version string'.
 ##
-get_installer_application_short_version_string()
-{
+get_installer_application_short_version_string() {
     local -r installer_application_path="$1"
 
     is_not_empty "${installer_application_path}" || return 1
@@ -2092,8 +2090,7 @@ get_installer_application_short_version_string()
 ## @param      $1    The path to an installer application.
 ## @param      $2    The new value for the 'short version string'.
 ##
-set_installer_application_short_version_string()
-{
+set_installer_application_short_version_string() {
     local -r installer_application_path="$1"
     local -r value="$2"
 
@@ -2110,8 +2107,7 @@ set_installer_application_short_version_string()
 ##
 ## @return     The installer application 'identifier'.
 ##
-get_installer_application_identifier()
-{
+get_installer_application_identifier() {
     local -r installer_application_path="$1"
 
     is_not_empty "${installer_application_path}" || return 1
@@ -2127,8 +2123,7 @@ get_installer_application_identifier()
 ##
 ## @return     The URL of the system image.
 ##
-get_system_image_url()
-{
+get_system_image_url() {
     local -r installer_application_path="$1"
 
     is_not_empty "${installer_application_path}" || return 1
