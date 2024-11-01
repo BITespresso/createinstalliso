@@ -4,20 +4,20 @@ Creates a bootable ISO image from a macOS installer application. This image can 
 
 ## Table of Contents
 
-1. [Introduction](#user-content-introduction)
-2. [Requirements](#user-content-requirements)
-3. [Compatibility](#user-content-compatibility)
-4. [Installation](#user-content-installation)
-5. [Usage](#user-content-usage)
-    1. [Command line arguments](#user-content-command-line-arguments)
-    2. [Example](#user-content-example)
-6. [Troubleshooting](#user-content-troubleshooting)
-    1. [Alert during macOS installation](#user-content-alert-during-macos-installation)
-7. [References](#user-content-references)
-    1. [Installer application types](#user-content-installer-application-types)
-    2. [Required external commands](#user-content-required-external-commands)
-    3. [Exit status and messages](#user-content-exit-status-and-messages)
-8. [License](#user-content-license)
+- [Introduction](#user-content-introduction)
+- [Requirements](#user-content-requirements)
+- [Compatibility](#user-content-compatibility)
+- [Installation](#user-content-installation)
+- [Usage](#user-content-usage)
+  - [Command line arguments](#user-content-command-line-arguments)
+  - [Example](#user-content-example)
+- [Troubleshooting](#user-content-troubleshooting)
+    - [Alert during macOS installation](#user-content-alert-during-macos-installation)
+- [References](#user-content-references)
+  - [Installer application types](#user-content-installer-application-types)
+  -[Required external commands](#user-content-required-external-commands)
+  - [Exit status and messages](#user-content-exit-status-and-messages)
+- [License](#user-content-license)
 
 ## Introduction
 
