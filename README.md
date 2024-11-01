@@ -51,27 +51,27 @@ The table below shows:
 * Which macOS installers can be used to create an ISO image with this particular macOS version.
 
 | macOS                 | Version | Can run **createinstalliso** | Can use installer for |
-| --------------------- | ------- |:----------------------------:| --------------------- |
-| Mac OS X Cheetah      | 10.0    | No                           | N/A                   |
-| Mac OS X Puma         | 10.1    | No                           | N/A                   |
-| Mac OS X Jaguar       | 10.2    | No                           | N/A                   |
-| Mac OS X Panther      | 10.3    | No                           | N/A                   |
-| Mac OS X Tiger        | 10.4    | No                           | N/A                   |
-| Mac OS X Leopard      | 10.5    | No                           | N/A                   |
-| Mac OS X Snow Leopard | 10.6    | Yes                          | 10.7 - 10.11          |
-| Mac OS X Lion         | 10.7    | Yes                          | 10.7 - 10.11          |
-| OS X Mountain Lion    | 10.8    | Yes                          | 10.7 - 10.15          |
-| OS X Mavericks        | 10.9    | Yes                          | 10.7 - 12             |
-| OS X Yosemite         | 10.10   | Yes                          | 10.7 - 12             |
-| OS X El Capitan       | 10.11   | Yes                          | 10.7 - 13             |
-| macOS Sierra          | 10.12   | Yes                          | 10.7 - 13             |
-| macOS High Sierra     | 10.13   | Yes                          | 10.7 - 14             |
-| macOS Mojave          | 10.14   | Yes                          | 10.7 - 14             |
-| macOS Catalina        | 10.15   | Yes                          | 10.7 - 14             |
-| macOS Big Sur         | 11      | Yes                          | 10.7 - 14             |
-| macOS Monterey        | 12      | Yes                          | 10.7 - 14             |
-| macOS Ventura         | 13      | Yes                          | 10.7 - 14             |
-| macOS Sonoma          | 14      | Yes                          | 10.7 - 14             |
+|-----------------------|---------|:----------------------------:|-----------------------|
+| Mac OS X Cheetah      | 10.0    |              No              | N/A                   |
+| Mac OS X Puma         | 10.1    |              No              | N/A                   |
+| Mac OS X Jaguar       | 10.2    |              No              | N/A                   |
+| Mac OS X Panther      | 10.3    |              No              | N/A                   |
+| Mac OS X Tiger        | 10.4    |              No              | N/A                   |
+| Mac OS X Leopard      | 10.5    |              No              | N/A                   |
+| Mac OS X Snow Leopard | 10.6    |             Yes              | 10.7 - 10.11          |
+| Mac OS X Lion         | 10.7    |             Yes              | 10.7 - 10.11          |
+| OS X Mountain Lion    | 10.8    |             Yes              | 10.7 - 10.15          |
+| OS X Mavericks        | 10.9    |             Yes              | 10.7 - 12             |
+| OS X Yosemite         | 10.10   |             Yes              | 10.7 - 12             |
+| OS X El Capitan       | 10.11   |             Yes              | 10.7 - 13             |
+| macOS Sierra          | 10.12   |             Yes              | 10.7 - 13             |
+| macOS High Sierra     | 10.13   |             Yes              | 10.7 - 14             |
+| macOS Mojave          | 10.14   |             Yes              | 10.7 - 14             |
+| macOS Catalina        | 10.15   |             Yes              | 10.7 - 14             |
+| macOS Big Sur         | 11      |             Yes              | 10.7 - 14             |
+| macOS Monterey        | 12      |             Yes              | 10.7 - 14             |
+| macOS Ventura         | 13      |             Yes              | 10.7 - 14             |
+| macOS Sonoma          | 14      |             Yes              | 10.7 - 14             |
 
 ### Installer version
 
@@ -80,27 +80,27 @@ The table below shows:
 * Which macOS version is required to use **createinstalliso** with a particular macOS installer.
 
 | Installer for         | Version | Required macOS version |
-| --------------------- | ------- |:----------------------:|
-| Mac OS X Cheetah      | 10.0    | N/A                    |
-| Mac OS X Puma         | 10.1    | N/A                    |
-| Mac OS X Jaguar       | 10.2    | N/A                    |
-| Mac OS X Panther      | 10.3    | N/A                    |
-| Mac OS X Tiger        | 10.4    | N/A                    |
-| Mac OS X Leopard      | 10.5    | N/A                    |
-| Mac OS X Snow Leopard | 10.6    | N/A                    |
-| Mac OS X Lion         | 10.7    | 10.6 or later          |
-| OS X Mountain Lion    | 10.8    | 10.6 or later          |
-| OS X Mavericks        | 10.9    | 10.6 or later          |
-| OS X Yosemite         | 10.10   | 10.6 or later          |
-| OS X El Capitan       | 10.11   | 10.6 or later          |
-| macOS Sierra          | 10.12   | 10.8 or later          |
-| macOS High Sierra     | 10.13   | 10.8 or later          |
-| macOS Mojave          | 10.14   | 10.8 or later          |
-| macOS Catalina        | 10.15   | 10.8 or later          |
-| macOS Big Sur         | 11      | 10.9 or later          |
-| macOS Monterey        | 12      | 10.9 or later          |
-| macOS Ventura         | 13      | 10.11 or later         |
-| macOS Sonoma          | 14      | 10.13 or later         |
+|-----------------------|---------|:----------------------:|
+| Mac OS X Cheetah      | 10.0    |          N/A           |
+| Mac OS X Puma         | 10.1    |          N/A           |
+| Mac OS X Jaguar       | 10.2    |          N/A           |
+| Mac OS X Panther      | 10.3    |          N/A           |
+| Mac OS X Tiger        | 10.4    |          N/A           |
+| Mac OS X Leopard      | 10.5    |          N/A           |
+| Mac OS X Snow Leopard | 10.6    |          N/A           |
+| Mac OS X Lion         | 10.7    |     10.6 or later      |
+| OS X Mountain Lion    | 10.8    |     10.6 or later      |
+| OS X Mavericks        | 10.9    |     10.6 or later      |
+| OS X Yosemite         | 10.10   |     10.6 or later      |
+| OS X El Capitan       | 10.11   |     10.6 or later      |
+| macOS Sierra          | 10.12   |     10.8 or later      |
+| macOS High Sierra     | 10.13   |     10.8 or later      |
+| macOS Mojave          | 10.14   |     10.8 or later      |
+| macOS Catalina        | 10.15   |     10.8 or later      |
+| macOS Big Sur         | 11      |     10.9 or later      |
+| macOS Monterey        | 12      |     10.9 or later      |
+| macOS Ventura         | 13      |     10.11 or later     |
+| macOS Sonoma          | 14      |     10.13 or later     |
 
 ## Installation
 
@@ -193,21 +193,21 @@ Apple has used different internal structures for its macOS installers over time.
 
 The installer application types are:
 
-| Name                  | Version | Type |
-| --------------------- | ------- |:----:|
-| Mac OS X Lion         | 10.7    | 1    |
-| OS X Mountain Lion    | 10.8    | 1    |
-| OS X Mavericks        | 10.9    | 2    |
-| OS X Yosemite         | 10.10   | 2    |
-| OS X El Capitan       | 10.11   | 2    |
-| macOS Sierra          | 10.12   | 3    |
-| macOS High Sierra     | 10.13   | 3    |
-| macOS Mojave          | 10.14   | 3    |
-| macOS Catalina        | 10.15   | 3    |
-| macOS Big Sur         | 11      | 4    |
-| macOS Monterey        | 12      | 4    |
-| macOS Ventura         | 13      | 4    |
-| macOS Sonoma          | 14      | 4    |
+| Name               | Version | Type |
+|--------------------|---------|:----:|
+| Mac OS X Lion      | 10.7    |  1   |
+| OS X Mountain Lion | 10.8    |  1   |
+| OS X Mavericks     | 10.9    |  2   |
+| OS X Yosemite      | 10.10   |  2   |
+| OS X El Capitan    | 10.11   |  2   |
+| macOS Sierra       | 10.12   |  3   |
+| macOS High Sierra  | 10.13   |  3   |
+| macOS Mojave       | 10.14   |  3   |
+| macOS Catalina     | 10.15   |  3   |
+| macOS Big Sur      | 11      |  4   |
+| macOS Monterey     | 12      |  4   |
+| macOS Ventura      | 13      |  4   |
+| macOS Sonoma       | 14      |  4   |
 
 ### Required external commands
 
@@ -248,7 +248,7 @@ A failure of **createinstalliso** is indicated by a non-zero exit status. Wherev
 The table below lists all possible exit status and corresponding messages:
 
 | Status | Message                                                                               |
-| ------ | ------------------------------------------------------------------------------------- |
+|--------|---------------------------------------------------------------------------------------|
 | 255    | You must specify both the ISO directory and install application path.                 |
 | 255    | createinstalliso: unrecognized option \`\[OPTION\]'                                   |
 | 255    | createinstalliso: invalid option -- \[OPTION\]                                        |
