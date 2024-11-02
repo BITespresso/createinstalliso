@@ -62,6 +62,7 @@ declare -r -a const_supported_macos_version_strings_regex=(
     '^12\.[[:digit:]]+(\.[[:digit:]]+)?$' # macOS Monterey        12
     '^13\.[[:digit:]]+(\.[[:digit:]]+)?$' # macOS Ventura         13
     '^14\.[[:digit:]]+(\.[[:digit:]]+)?$' # macOS Sonoma          14
+    '^15\.[[:digit:]]+(\.[[:digit:]]+)?$' # macOS Sequoia         15
 )
 
 # List of all supported installer applications and their disk space
@@ -84,6 +85,7 @@ declare -r -a const_supported_installer_application_display_names_and_offsets=(
     'Install macOS Monterey     # 1900 # 1300' # 12
     'Install macOS Ventura      # 1450 # 1300' # 13
     'Install macOS Sonoma       # 2100 # 1350' # 14
+    'Install macOS Sequoia      # 2250 # 1350' # 15
 )
 
 # List of all known macOS version names and their corresponding version
@@ -109,6 +111,7 @@ declare -r -a const_known_macos_names_and_version_strings_regex=(
     '^12\.[[:digit:]]+(\.[[:digit:]]+)?$ # macOS Monterey'        # 12
     '^13\.[[:digit:]]+(\.[[:digit:]]+)?$ # macOS Ventura'         # 13
     '^14\.[[:digit:]]+(\.[[:digit:]]+)?$ # macOS Sonoma'          # 14
+    '^15\.[[:digit:]]+(\.[[:digit:]]+)?$ # macOS Sequoia'         # 15
 )
 
 declare global_patch_macos_sierra_installer_application="false"
@@ -447,6 +450,7 @@ main() {
         # - macOS Monterey 12
         # - macOS Ventura 13
         # - macOS Sonoma 14
+        # - macOS Sequoia 15
         3 | 4 )
             (( offset_for_tmp_directory = $(get_offset_for_tmp_directory "${installer_application_display_name}") )) || offset_for_tmp_directory=0
             (( required_in_tmp_directory = $(get_disk_space_used_by_file_or_directory "${installer_application_path}") ))
@@ -590,6 +594,7 @@ main() {
         # - macOS Monterey 12
         # - macOS Ventura 13
         # - macOS Sonoma 14
+        # - macOS Sequoia 15
         3 | 4 )
             echo "Creating empty disk image..."
             install_disk_image="${global_tmp_directory}/InstallDisk.sparseimage"
@@ -1733,6 +1738,7 @@ is_valid_installer_application_path() {
         # - macOS Monterey 12
         # - macOS Ventura 13
         # - macOS Sonoma 14
+        # - macOS Sequoia 15
         4 )
             # Apple's command 'createinstallmedia' is required because
             # it will be used to create the installer disk image.
@@ -1899,6 +1905,7 @@ get_installer_application_display_name() {
 ##               - macOS Monterey 12
 ##               - macOS Ventura 13
 ##               - macOS Sonoma 14
+##               - macOS Sequoia 15
 ##
 ## @param      $1    The path to an installer application.
 ##
@@ -1983,7 +1990,8 @@ get_minimum_macos_version_string() {
 
         # Installer application for:
         # - macOS Sonoma 14
-        "Install macOS Sonoma" )
+        # - macOS Sequoia 15
+        "Install macOS Sonoma" | "Install macOS Sequoia" )
             minimum_macos_version_string="10.13"
             ;;
 

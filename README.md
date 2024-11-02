@@ -65,13 +65,14 @@ The table below shows:
 | OS X Yosemite         | 10.10   |             Yes              | 10.7 - 12             |
 | OS X El Capitan       | 10.11   |             Yes              | 10.7 - 13             |
 | macOS Sierra          | 10.12   |             Yes              | 10.7 - 13             |
-| macOS High Sierra     | 10.13   |             Yes              | 10.7 - 14             |
-| macOS Mojave          | 10.14   |             Yes              | 10.7 - 14             |
-| macOS Catalina        | 10.15   |             Yes              | 10.7 - 14             |
-| macOS Big Sur         | 11      |             Yes              | 10.7 - 14             |
-| macOS Monterey        | 12      |             Yes              | 10.7 - 14             |
-| macOS Ventura         | 13      |             Yes              | 10.7 - 14             |
-| macOS Sonoma          | 14      |             Yes              | 10.7 - 14             |
+| macOS High Sierra     | 10.13   |             Yes              | 10.7 - 15             |
+| macOS Mojave          | 10.14   |             Yes              | 10.7 - 15             |
+| macOS Catalina        | 10.15   |             Yes              | 10.7 - 15             |
+| macOS Big Sur         | 11      |             Yes              | 10.7 - 15             |
+| macOS Monterey        | 12      |             Yes              | 10.7 - 15             |
+| macOS Ventura         | 13      |             Yes              | 10.7 - 15             |
+| macOS Sonoma          | 14      |             Yes              | 10.7 - 15             |
+| macOS Sequoia         | 15      |             Yes              | 10.7 - 15             |
 
 ### Installer version
 
@@ -101,6 +102,7 @@ The table below shows:
 | macOS Monterey        | 12      |     10.9 or later      |
 | macOS Ventura         | 13      |     10.11 or later     |
 | macOS Sonoma          | 14      |     10.13 or later     |
+| macOS Sequoia         | 15      |     10.13 or later     |
 
 ## Installation
 
@@ -208,6 +210,7 @@ The installer application types are:
 | macOS Monterey     | 12      |  4   |
 | macOS Ventura      | 13      |  4   |
 | macOS Sonoma       | 14      |  4   |
+| macOS Sequoia      | 15      |  4   |
 
 ### Required external commands
 
