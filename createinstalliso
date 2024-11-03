@@ -27,6 +27,7 @@ fi
 # ======================================================================
 
 declare -r const_script_name="createinstalliso"
+declare -r const_script_version="1.1.0"
 declare -r const_minimum_required_macos_version_string="10.6"
 declare -r -i const_root_uid=0
 
