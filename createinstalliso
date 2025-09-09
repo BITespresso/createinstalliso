@@ -506,7 +506,7 @@ main() {
 
         echo "Copying installer application..."
         ditto "${original_installer_application_path}" "${modified_installer_application_path}" >/dev/null || exit_with_status 220 "Failed to copy installer application."
-        find "${path}" -print0 | xargs -0 xattr -d com.apple.quarantine {} \; 2>/dev/null || true
+        /usr/bin/xattr -drs "com.apple.quarantine" "${modified_installer_application_path}" >/dev/null || exit_with_status 219 "Failed to remove extended attribute com.apple.quarantine."
 
         if [[ "${global_patch_macos_sierra_installer_application}" == "true" ]]; then
             echo "Patching macOS Sierra installer application..."
